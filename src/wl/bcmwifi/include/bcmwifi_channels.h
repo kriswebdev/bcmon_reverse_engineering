@@ -65,8 +65,7 @@ typedef uint16 chanspec_t;
 #define WL_CHANSPEC_BAND_SHIFT		12
 #define WL_CHANSPEC_BAND_5G		0x1000
 #define WL_CHANSPEC_BAND_2G		0x2000
-#define INVCHANSPEC				255
-
+#define INVCHANSPEC	255
 
 #define LOWER_20_SB(channel)	(((channel) > CH_10MHZ_APART) ? ((channel) - CH_10MHZ_APART) : 0)
 #define UPPER_20_SB(channel)	(((channel) < (MAXCHANNEL - CH_10MHZ_APART)) ? \

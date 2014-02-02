@@ -173,7 +173,7 @@ sdioh_attach(osl_t *osh, void *bar0, uint irq)
 		MFREE(sd->osh, sd, sizeof(sdioh_info_t));
 		return NULL;
 	}
-
+	
 	if (gInstance->func[2]) {
 		/* Claim host controller F2 */
 		sdio_claim_host(gInstance->func[2]);

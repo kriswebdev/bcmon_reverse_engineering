@@ -1695,7 +1695,6 @@ wl_cfgp2p_down(struct wl_priv *wl)
 {
 	if (wl->p2p == NULL)
 		return 0;
-
 	if (timer_pending(&wl->p2p->listen_timer))
 		del_timer_sync(&wl->p2p->listen_timer);
 	wl_cfgp2p_deinit_priv(wl);

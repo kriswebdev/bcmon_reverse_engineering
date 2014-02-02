@@ -140,7 +140,7 @@ static int bcmsdh_sdmmc_probe(struct sdio_func *func,
 	}else {
 		ret = -ENODEV;
 	}
-
+	
 	return ret;
 }
 
@@ -198,7 +198,7 @@ static int bcmsdh_sdmmc_suspend(struct device *pdev)
 #if defined(OOB_INTR_ONLY)
 	bcmsdh_oob_intr_set(0);
 #endif	/* defined(OOB_INTR_ONLY) */
-#endif /* !CUSTOMER_HW_SAMSUNG */
+#endif	/* defined(OOB_INTR_ONLY) */
 	dhd_mmc_suspend = TRUE;
 	smp_mb();
 
@@ -218,7 +218,7 @@ static int bcmsdh_sdmmc_resume(struct device *pdev)
 	if ((func->num == 2) && dhd_os_check_if_up(bcmsdh_get_drvdata()))
 		bcmsdh_oob_intr_set(1);
 #endif /* (OOB_INTR_ONLY) */
-#endif /* !CUSTOMER_HW_SAMSUNG */
+#endif /* (OOB_INTR_ONLY) */
 
 	smp_mb();
 	return 0;
@@ -271,10 +271,10 @@ static struct sdio_driver bcmsdh_sdmmc_driver = {
 	.id_table	= bcmsdh_sdmmc_ids,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) && defined(CONFIG_PM)
 	.drv = {
-	.pm	= &bcmsdh_sdmmc_pm_ops,
+		.pm	= &bcmsdh_sdmmc_pm_ops,
 	},
 #endif /* (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)) && defined(CONFIG_PM) */
-	};
+};
 
 struct sdos_info {
 	sdioh_info_t *sd;
@@ -319,7 +319,7 @@ sdioh_interrupt_set(sdioh_info_t *sd, bool enable)
 
 	if(!sd)
 		return BCME_BADARG;
-
+		
 	sd_trace(("%s: %s\n", __FUNCTION__, enable ? "Enabling" : "Disabling"));
 
 	sdos = (struct sdos_info *)sd->sdos_info;

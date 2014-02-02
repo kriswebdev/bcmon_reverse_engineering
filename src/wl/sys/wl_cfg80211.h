@@ -65,7 +65,7 @@ struct wl_ibss;
 #define	WL_ERR(args)									\
 do {										\
 	if (wl_dbg_level & WL_DBG_ERR) {				\
-			printk(KERN_ERR "CFG80211-INF02) %s : ", __func__);	\
+			printk(KERN_ERR "CFG80211-INFO2) %s : ", __func__);	\
 			printk args;						\
 		}								\
 } while (0)
@@ -127,7 +127,7 @@ do {									\
 #define WL_SCAN_RETRY_MAX	3
 #define WL_NUM_PMKIDS_MAX	MAXPMKID
 #define WL_SCAN_BUF_MAX		(1024 * 8)
-#define WL_TLV_INFO_MAX		1500 /* customer want to large size IE, so increase ie length */
+#define WL_TLV_INFO_MAX 	1500 /* customer want to large size IE, so increase ie length */
 #define WL_SCAN_IE_LEN_MAX      2048
 #define WL_BSS_INFO_MAX		2048
 #define WL_ASSOC_INFO_MAX	512
@@ -601,10 +601,10 @@ wl_set_status_all(struct wl_priv *wl, s32 status, u32 op)
 	struct net_info *_net_info, *next;\
 	int found = 0;\
 	list_for_each_entry_safe(_net_info, next, &(wl)->net_list, list) {\
-		if(_ndev && ((_net_info->ndev) == _ndev)) { \
+		if(_ndev && ((_net_info->ndev) == _ndev)) {\
 			found = 1;\
 			switch(op){\
-				case 1: \
+				case 1:\
 					set_bit(status, &(_net_info->sme_state));\
 					if (wl->state_notifier && test_bit(status, &(wl->interrested_state))) \
 						wl->state_notifier(wl, _net_info, status, true); \
@@ -612,11 +612,11 @@ wl_set_status_all(struct wl_priv *wl, s32 status, u32 op)
 						WL_SCAN2(("<<<Set SCANNING bit %p>>>\n", _ndev));\
 					break;\
 				case 2:\
-					clear_bit(status, &(_net_info->sme_state)); \
+					 clear_bit(status, &(_net_info->sme_state));\
 					if (wl->state_notifier && test_bit(status, &(wl->interrested_state))) \
 						wl->state_notifier(wl, _net_info, status, false); \
-					if(status == WL_STATUS_SCANNING) \
-						WL_SCAN2(("<<<Clear SCANNING bit %p>>>\n", _ndev)); \
+					if(status == WL_STATUS_SCANNING)\
+						WL_SCAN2(("<<<Clear SCANNING bit %p>>>\n", _ndev));\
 					break;\
 				case 4:\
 					 change_bit(status, &(_net_info->sme_state));\
@@ -719,7 +719,6 @@ static inline struct net_info *
 wl_get_netinfo_by_netdev(struct wl_priv *wl, struct net_device *ndev)
 {
 	struct net_info *_net_info, *next;
-
 	list_for_each_entry_safe(_net_info, next, &wl->net_list, list) {
 				if (ndev && (_net_info->ndev == ndev))
 					return _net_info;

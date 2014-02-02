@@ -308,7 +308,11 @@ dhd_wl_ioctl(dhd_pub_t *dhd_pub, int ifindex, wl_ioctl_t *ioc, void *buf, int le
 	dhd_os_proto_block(dhd_pub);
 
 	ret = dhd_prot_ioctl(dhd_pub, ifindex, ioc, buf, len);
+#ifdef BCM4334_CHIP
+	if (!ret || ret == -ETIMEDOUT || (dhd_pub->tx_seq_badcnt >= 2))
+#else
 	if (!ret || ret == -ETIMEDOUT)
+#endif
 		dhd_os_check_hang(dhd_pub, ifindex, ret);
 
 	dhd_os_proto_unblock(dhd_pub);
@@ -1779,7 +1783,6 @@ bool dhd_is_associated(dhd_pub_t *dhd, void *bss_buf, int *retval)
 	if (ret == BCME_NOTASSOCIATED) {
 		DHD_TRACE(("%s: not associated! res:%d\n", __FUNCTION__, ret));
 	}
-
 	if (retval)
 		*retval = ret;
 
@@ -1858,7 +1861,7 @@ exit:
 bool dhd_check_ap_wfd_mode_set(dhd_pub_t *dhd)
 {
 #ifdef  WL_CFG80211
-	if (dhd_concurrent_fw(dhd))
+	if ((dhd->op_mode & CONCURRENT_MASK) == CONCURRENT_MASK)
 		return FALSE;
 	if (((dhd->op_mode & HOSTAPD_MASK) == HOSTAPD_MASK) ||
 		((dhd->op_mode & WFD_MASK) == WFD_MASK))
