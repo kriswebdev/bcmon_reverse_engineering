@@ -186,7 +186,6 @@ char fw_down_path[MOD_PARAM_PATHLEN];
 #define	GPIO_DEV_WAKEUP			17	/* Host gpio17 mapped to device gpio1 wakeup */
 #define	CC_CHIPCTRL2_GPIO1_WAKEUP	(1  << 0)
 
-
 /* Private data for SDIO bus interaction */
 typedef struct dhd_bus {
 	dhd_pub_t	*dhd;
@@ -2252,7 +2251,7 @@ dhdsdio_devram_remap(dhd_bus_t *bus, bool val)
 	si_socdevram(bus->sih, TRUE, &enable, &protect, &remap);
 }
 
-static int
+int
 dhdsdio_membytes(dhd_bus_t *bus, bool write, uint32 address, uint8 *data, uint size)
 {
 	int bcmerror = 0;
@@ -4931,6 +4930,16 @@ deliver:
 				DHD_ERROR(("%s: glom superframe w/o descriptor!\n", __FUNCTION__));
 				dhdsdio_rxfail(bus, FALSE, FALSE);
 			}
+			continue;
+		}
+
+		if(chan==0xf)
+		{
+			//PKTSETLEN(osh, pkt, len+14);
+			//PKTPULL(osh, pkt, doff);
+			dhd_os_sdunlock(bus->dhd);
+			dhd_rx_frame(bus->dhd, ifidx, pkt, 1, chan);
+			dhd_os_sdlock(bus->dhd);
 			continue;
 		}
 

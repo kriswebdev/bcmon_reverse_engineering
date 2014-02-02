@@ -155,7 +155,8 @@ dhd-y := src/bcmsdio/sys/bcmsdh.o	src/bcmsdio/sys/bcmsdh_linux.o \
 	 src/shared/sbutils.o		src/shared/siutils.o \
 	 src/wl/sys/wl_android.o	src/wl/sys/wl_cfg80211.o \
 	 src/wl/sys/wl_cfgp2p.o		src/wl/sys/wldev_common.o \
-	 src/wl/sys/wl_linux_mon.o	src/wl/sys/wl_roam.o
+	 src/wl/sys/wl_linux_mon.o	src/wl/sys/wl_roam.o \
+	 src/dhd/sys/bcmon.o
 
 all:
 	@echo "$(MAKE) --no-print-directory -C $(KDIR) SUBDIRS=$(CURDIR) modules"
