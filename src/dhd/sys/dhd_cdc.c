@@ -2,13 +2,13 @@
  * DHD Protocol Module for CDC and BDC.
  *
  * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -16,12 +16,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_cdc.c 328424 2012-04-19 05:23:09Z $
+ * $Id: dhd_cdc.c 304241 2011-12-21 16:43:50Z $
  *
  * BDC is like CDC, except it includes a header for data packets to convey
  * packet priority over the bus, and flags (e.g. to indicate checksum status
@@ -113,16 +113,22 @@ dhdcdc_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len)
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
+#ifdef CUSTOMER_HW_SAMSUNG
+	DHD_OS_WAKE_LOCK(dhd);
+#endif /* CUSTOMER_HW_SAMSUNG */
 	do {
 		ret = dhd_bus_rxctl(dhd->bus, (uchar*)&prot->msg, cdc_len);
 		if (ret < 0)
 			break;
 	} while (CDC_IOC_ID(ltoh32(prot->msg.flags)) != id);
 
+#ifdef CUSTOMER_HW_SAMSUNG
+	DHD_OS_WAKE_UNLOCK(dhd);
+#endif /* CUSTOMER_HW_SAMSUNG */
 	return ret;
 }
 
-static int
+int
 dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8 action)
 {
 	dhd_prot_t *prot = dhd->prot;
@@ -210,6 +216,10 @@ done:
 	return ret;
 }
 
+#ifdef CONFIG_CONTROL_PM
+extern bool g_pm_control;
+#endif
+
 static int
 dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8 action)
 {
@@ -232,6 +242,13 @@ dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8
 			__FUNCTION__));
 		return -EIO;
 	}
+#ifdef CONFIG_CONTROL_PM
+	if ((g_pm_control == TRUE) && (cmd == WLC_SET_PM))
+	{
+		DHD_ERROR(("SET PM ignored!!!!!!!!!!!!!!!!!!!!!!\n"));
+		goto done;
+	}
+#endif
 
 	memset(msg, 0, sizeof(cdc_ioctl_t));
 
@@ -279,8 +296,9 @@ done:
 
 
 int
-dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
+dhd_prot_ioctl(void *dhd_copy, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 {
+	dhd_pub_t *dhd = (dhd_pub_t *)dhd_copy;
 	dhd_prot_t *prot = dhd->prot;
 	int ret = -1;
 	uint8 action;
@@ -441,12 +459,10 @@ dhd_wlfc_dump(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf)
 
 			ea = interfaces[i].ea;
 			bcm_bprintf(strbuf, "INTERFACE[%d].ea = "
-				"[%02x:%02x:%02x:%02x:%02x:%02x], if:%d, type: %s"
-				"netif_flow_control:%s\n", i,
+				"[%02x:%02x:%02x:%02x:%02x:%02x], if:%d, type: %s\n", i,
 				ea[0], ea[1], ea[2], ea[3], ea[4], ea[5],
 				interfaces[i].interface_id,
-				iftype_desc, ((wlfc->hostif_flow_state[i] == OFF)
-				? " OFF":" ON"));
+				iftype_desc);
 
 			bcm_bprintf(strbuf, "INTERFACE[%d].DELAYQ(len,state,credit)"
 				"= (%d,%s,%d)\n",
@@ -476,7 +492,7 @@ dhd_wlfc_dump(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf)
 		if (mac_table[i].occupied) {
 			ea = mac_table[i].ea;
 			bcm_bprintf(strbuf, "MAC_table[%d].ea = "
-				"[%02x:%02x:%02x:%02x:%02x:%02x], if:%d \n", i,
+				"[%02x:%02x:%02x:%02x:%02x:%02x], if:%d\n", i,
 				ea[0], ea[1], ea[2], ea[3], ea[4], ea[5],
 				mac_table[i].interface_id);
 
@@ -816,6 +832,7 @@ _dhd_wlfc_find_table_entry(athost_wl_status_info_t* ctx, void* p)
 	uint8 ifid = DHD_PKTTAG_IF(PKTTAG(p));
 	uint8* dstn = DHD_PKTTAG_DSTN(PKTTAG(p));
 
+	/* no lookup necessary, only if this packet belongs to STA interface */
 	if (((ctx->destination_entries.interfaces[ifid].iftype == WLC_E_IF_ROLE_STA) ||
 		ETHER_ISMULTI(dstn) ||
 		(ctx->destination_entries.interfaces[ifid].iftype == WLC_E_IF_ROLE_P2P_CLIENT)) &&
@@ -918,7 +935,7 @@ _dhd_wlfc_flow_control_check(athost_wl_status_info_t* ctx, struct pktq* pq, uint
 		pq->len, if_id, __FUNCTION__));
 		*/
 		WLFC_DBGMESG(("F"));
-		dhd_txflowcontrol(ctx->dhdp, if_id, OFF);
+		/* dhd_txflowcontrol(ctx->dhdp, if_id, OFF); */
 		ctx->toggle_host_if = 0;
 	}
 	if ((pq->len >= WLFC_FLOWCONTROL_HIWATER) && (ctx->hostif_flow_state[if_id] == OFF)) {
@@ -929,7 +946,7 @@ _dhd_wlfc_flow_control_check(athost_wl_status_info_t* ctx, struct pktq* pq, uint
 		pq->len, if_id, __FUNCTION__));
 		*/
 		WLFC_DBGMESG(("N"));
-		dhd_txflowcontrol(ctx->dhdp, if_id, ON);
+		/* dhd_txflowcontrol(ctx->dhdp, if_id, ON); */
 		ctx->host_ifidx = if_id;
 		ctx->toggle_host_if = 1;
 	}
@@ -1232,11 +1249,13 @@ _dhd_wlfc_deque_delayedq(athost_wl_status_info_t* ctx,
 }
 
 static void*
-_dhd_wlfc_deque_sendq(athost_wl_status_info_t* ctx, int prec)
+_dhd_wlfc_deque_sendq(athost_wl_status_info_t* ctx, int prec, uint8* ac_credit_spent)
 {
 	wlfc_mac_descriptor_t* entry;
 	void* p;
 
+	/* most cases a packet will count against FIFO credit */
+	*ac_credit_spent = 1;
 
 	p = pktq_pdeq(&ctx->SENDQ, prec);
 	if (p != NULL) {
@@ -1251,7 +1270,7 @@ _dhd_wlfc_deque_sendq(athost_wl_status_info_t* ctx, int prec)
 			return p;
 		}
 
-		while ((p != NULL)) {
+		while ((p != NULL) && _dhd_wlfc_is_destination_closed(ctx, entry, prec)) {
 			/*
 			- suppressed packets go to sub_queue[2*prec + 1] AND
 			- delayed packets go to sub_queue[2*prec + 0] to ensure
@@ -1268,7 +1287,7 @@ _dhd_wlfc_deque_sendq(athost_wl_status_info_t* ctx, int prec)
 			if applicable
 			*/
 			_dhd_wlfc_traffic_pending_check(ctx, entry, prec);
-
+			_dhd_wlfc_flow_control_check(ctx, &entry->psq, DHD_PKTTAG_IF(PKTTAG(p)));
 			p = pktq_pdeq(&ctx->SENDQ, prec);
 			if (p == NULL)
 				break;
@@ -1279,6 +1298,23 @@ _dhd_wlfc_deque_sendq(athost_wl_status_info_t* ctx, int prec)
 				return p;
 			}
 		}
+		if (p) {
+			if (entry->requested_packet == 0) {
+				if (entry->requested_credit > 0)
+					entry->requested_credit--;
+			}
+			else {
+				entry->requested_packet--;
+				DHD_PKTTAG_SETONETIMEPKTRQST(PKTTAG(p));
+			}
+			if (entry->state == WLFC_STATE_CLOSE)
+				*ac_credit_spent = 0;
+#ifdef PROP_TXSTATUS_DEBUG
+			entry->dstncredit_sent_packets++;
+#endif
+		}
+		if (p)
+			_dhd_wlfc_flow_control_check(ctx, &ctx->SENDQ, DHD_PKTTAG_IF(PKTTAG(p)));
 	}
 	return p;
 }
@@ -1312,6 +1348,7 @@ _dhd_wlfc_mac_entry_update(athost_wl_status_info_t* ctx, wlfc_mac_descriptor_t* 
 		if (ea != NULL)
 			memcpy(&entry->ea[0], ea, ETHER_ADDR_LEN);
 	}
+
 	else if (action == eWLFC_MAC_ENTRY_ACTION_DEL) {
 		entry->occupied = 0;
 		entry->state = WLFC_STATE_CLOSE;
@@ -1408,13 +1445,41 @@ dhd_wlfc_enque_sendq(void* state, int prec, void* p)
 }
 
 int
-_dhd_wlfc_handle_packet_commit(athost_wl_status_info_t* ctx, int ac,
-    dhd_wlfc_commit_info_t *commit_info, f_commitpkt_t fcommit, void* commit_ctx)
+dhd_wlfc_commit_packets(void* state, f_commitpkt_t fcommit, void* commit_ctx)
 {
+	int ac;
+	int credit;
+	uint8 ac_fifo_credit_spent;
+	uint8 needs_hdr;
 	uint32 hslot;
+	void* p;
 	int	rc;
+	athost_wl_status_info_t* ctx = (athost_wl_status_info_t*)state;
+	wlfc_mac_descriptor_t* mac_entry;
+
+	if ((state == NULL) ||
+		(fcommit == NULL)) {
+		WLFC_DBGMESG(("Error: %s():%d\n", __FUNCTION__, __LINE__));
+		return BCME_BADARG;
+	}
 
 	/*
+	Commit packets for regular AC traffic. Higher priority first.
+
+	-NOTE:
+	If the bus between the host and firmware is overwhelmed by the
+	traffic from host, it is possible that higher priority traffic
+	starves the lower priority queue. If that occurs often, we may
+	have to employ weighted round-robin or ucode scheme to avoid
+	low priority packet starvation.
+	*/
+	for (ac = AC_COUNT; ac >= 0; ac--) {
+		for (credit = 0; credit < ctx->FIFO_credit[ac];) {
+			p = _dhd_wlfc_deque_delayedq(ctx, ac, &ac_fifo_credit_spent, &needs_hdr,
+				&mac_entry);
+			if (p == NULL)
+				break;
+			/*
 		if ac_fifo_credit_spent = 0
 
 		This packet will not count against the FIFO credit.
@@ -1427,258 +1492,77 @@ _dhd_wlfc_handle_packet_commit(athost_wl_status_info_t* ctx, int ac,
 		This is a normal packet and it counts against the FIFO
 		credit count.
 	*/
-	DHD_PKTTAG_SETCREDITCHECK(PKTTAG(commit_info->p), commit_info->ac_fifo_credit_spent);
-	rc = _dhd_wlfc_pretx_pktprocess(ctx, commit_info->mac_entry, commit_info->p,
-	     commit_info->needs_hdr, &hslot);
+			DHD_PKTTAG_SETCREDITCHECK(PKTTAG(p), ac_fifo_credit_spent);
+			rc = _dhd_wlfc_pretx_pktprocess(ctx, mac_entry, p, needs_hdr, &hslot);
 
 	if (rc == BCME_OK)
-		rc = fcommit(commit_ctx, commit_info->p);
+				rc = fcommit(commit_ctx, p);
 	else
 		ctx->stats.generic_error++;
 
 	if (rc == BCME_OK) {
 		ctx->stats.pkt2bus++;
-		if (commit_info->ac_fifo_credit_spent) {
+				if (ac_fifo_credit_spent) {
 			ctx->stats.sendq_pkts[ac]++;
 			WLFC_HOST_FIFO_CREDIT_INC_SENTCTRS(ctx, ac);
+					/*
+					1 FIFO credit has been spent by sending this packet
+					to the device.
+					*/
+					credit++;
 		}
 	}
 	else {
+				/* bus commit has failed, rollback. */
+				rc = _dhd_wlfc_rollback_packet_toq(ctx,
+					p,
 		/*
-		   bus commit has failed, rollback.
 		   - remove wl-header for a delayed packet
 		   - save wl-header header for suppressed packets
 		*/
-		rc = _dhd_wlfc_rollback_packet_toq(ctx,	commit_info->p,
-		     (commit_info->pkt_type), hslot);
+					(needs_hdr ? eWLFC_PKTTYPE_DELAYED :
+					eWLFC_PKTTYPE_SUPPRESSED),
+					hslot);
 		if (rc != BCME_OK)
 			ctx->stats.rollback_failed++;
-
-		rc = BCME_ERROR;
-	}
-
-	return rc;
 }
-
-int
-dhd_wlfc_commit_packets(void* state, f_commitpkt_t fcommit, void* commit_ctx)
-{
-	int ac;
-	int credit;
-	int rc;
-	dhd_wlfc_commit_info_t  commit_info;
-	athost_wl_status_info_t* ctx = (athost_wl_status_info_t*)state;
-	int credit_count = 0;
-	int bus_retry_count = 0;
-	uint8 ac_available = 0;  /* Bitmask for 4 ACs + BC/MC */
-
-	if ((state == NULL) ||
-		(fcommit == NULL)) {
-		WLFC_DBGMESG(("Error: %s():%d\n", __FUNCTION__, __LINE__));
-		return BCME_BADARG;
 	}
-
-	memset(&commit_info, 0, sizeof(commit_info));
-
-	/*
-	Commit packets for regular AC traffic. Higher priority first.
-	First, use up FIFO credits available to each AC. Based on distribution
-	and credits left, borrow from other ACs as applicable
-
-	-NOTE:
-	If the bus between the host and firmware is overwhelmed by the
-	traffic from host, it is possible that higher priority traffic
-	starves the lower priority queue. If that occurs often, we may
-	have to employ weighted round-robin or ucode scheme to avoid
-	low priority packet starvation.
-	*/
-
-	for (ac = AC_COUNT; ac >= 0; ac--) {
-
-		int initial_credit_count = ctx->FIFO_credit[ac];
-
-		/* packets from SENDQ are fresh and they'd need header and have no MAC entry */
-		commit_info.needs_hdr = 1;
-		commit_info.mac_entry = NULL;
-		commit_info.pkt_type = eWLFC_PKTTYPE_NEW;
-
-		do {
-			commit_info.p = _dhd_wlfc_deque_sendq(ctx, ac);
-			if (commit_info.p == NULL)
-				break;
-			else if (ETHER_ISMULTI(DHD_PKTTAG_DSTN(PKTTAG(commit_info.p)))) {
-				ASSERT(ac == AC_COUNT);
-
-				if (ctx->FIFO_credit[ac]) {
-					rc = _dhd_wlfc_handle_packet_commit(ctx, ac, &commit_info,
-						fcommit, commit_ctx);
-
-			/* Bus commits may fail (e.g. flow control); abort after retries */
-					if (rc == BCME_OK) {
-						if (commit_info.ac_fifo_credit_spent) {
-							(void) _dhd_wlfc_borrow_credit(ctx,
-								ac_available, ac);
-							credit_count--;
-						}
-					} else {
-						bus_retry_count++;
-						if (bus_retry_count >= BUS_RETRIES) {
-							DHD_ERROR((" %s: bus error\n",
-								__FUNCTION__));
-							return rc;
-						}
-					}
-				}
-			}
-
-		} while (commit_info.p);
-
+		ctx->FIFO_credit[ac] -= credit;
+		/* packets from SENDQ are fresh and they'd need header */
+		needs_hdr = 1;
 		for (credit = 0; credit < ctx->FIFO_credit[ac];) {
-			commit_info.p = _dhd_wlfc_deque_delayedq(ctx, ac,
-			                &(commit_info.ac_fifo_credit_spent),
-			                &(commit_info.needs_hdr),
-			                &(commit_info.mac_entry));
-
-			if (commit_info.p == NULL)
+			p = _dhd_wlfc_deque_sendq(ctx, ac, &ac_fifo_credit_spent);
+			if (p == NULL)
 				break;
 
-			commit_info.pkt_type = (commit_info.needs_hdr) ? eWLFC_PKTTYPE_DELAYED :
-				eWLFC_PKTTYPE_SUPPRESSED;
+			DHD_PKTTAG_SETCREDITCHECK(PKTTAG(p), ac_fifo_credit_spent);
+			rc = _dhd_wlfc_pretx_pktprocess(ctx, NULL, p, needs_hdr, &hslot);
+			if (rc == BCME_OK)
+				rc = fcommit(commit_ctx, p);
+			else
+				ctx->stats.generic_error++;
 
-			rc = _dhd_wlfc_handle_packet_commit(ctx, ac, &commit_info,
-			     fcommit, commit_ctx);
-
-			/* Bus commits may fail (e.g. flow control); abort after retries */
 			if (rc == BCME_OK) {
-				if (commit_info.ac_fifo_credit_spent) {
+				ctx->stats.pkt2bus++;
+				if (ac_fifo_credit_spent) {
+					WLFC_HOST_FIFO_CREDIT_INC_SENTCTRS(ctx, ac);
+					ctx->stats.sendq_pkts[ac]++;
 					credit++;
 				}
 			}
 			else {
-				bus_retry_count++;
-				if (bus_retry_count >= BUS_RETRIES) {
-					DHD_ERROR(("dhd_wlfc_commit_packets(): bus error\n"));
-					ctx->FIFO_credit[ac] -= credit;
-					return rc;
-				}
+				/* bus commit has failed, rollback. */
+				rc = _dhd_wlfc_rollback_packet_toq(ctx,
+					p,
+					/* remove wl-header while rolling back */
+					eWLFC_PKTTYPE_NEW,
+					hslot);
+				if (rc != BCME_OK)
+					ctx->stats.rollback_failed++;
 			}
 		}
-
 		ctx->FIFO_credit[ac] -= credit;
-
-
-		/* If no credits were used, the queue is idle and can be re-used
-		   Note that resv credits cannot be borrowed
-		   */
-		if (initial_credit_count == ctx->FIFO_credit[ac]) {
-			ac_available |= (1 << ac);
-			credit_count += ctx->FIFO_credit[ac];
-		}
 	}
-
-	/* We borrow only for AC_BE and only if no other traffic seen for DEFER_PERIOD
-
-	   Note that (ac_available & WLFC_AC_BE_TRAFFIC_ONLY) is done to:
-	   a) ignore BC/MC for deferring borrow
-	   b) ignore AC_BE being available along with other ACs
-		  (this should happen only for pure BC/MC traffic)
-
-	   i.e. AC_VI, AC_VO, AC_BK all MUST be available (i.e. no traffic) and
-	   we do not care if AC_BE and BC/MC are available or not
-	   */
-	if ((ac_available & WLFC_AC_BE_TRAFFIC_ONLY) == WLFC_AC_BE_TRAFFIC_ONLY) {
-
-		if (ctx->allow_credit_borrow) {
-			ac = 1;  /* Set ac to AC_BE and borrow credits */
-		}
-		else {
-			int delta;
-			int curr_t = OSL_SYSUPTIME();
-
-			if (curr_t > ctx->borrow_defer_timestamp)
-				delta = curr_t - ctx->borrow_defer_timestamp;
-			else
-				delta = 0xffffffff + curr_t - ctx->borrow_defer_timestamp;
-
-			if (delta >= WLFC_BORROW_DEFER_PERIOD_MS) {
-				/* Reset borrow but defer to next iteration (defensive borrowing) */
-				ctx->allow_credit_borrow = TRUE;
-				ctx->borrow_defer_timestamp = 0;
-			}
-			return BCME_OK;
-		}
-	}
-	else {
-		/* If we have multiple AC traffic, turn off borrowing, mark time and bail out */
-		ctx->allow_credit_borrow = FALSE;
-		ctx->borrow_defer_timestamp = OSL_SYSUPTIME();
-		return BCME_OK;
-	}
-
-	/* At this point, borrow all credits only for "ac" (which should be set above to AC_BE)
-	   Generically use "ac" only in case we extend to all ACs in future
-	   */
-	for (; (credit_count > 0);) {
-
-		commit_info.p = _dhd_wlfc_deque_delayedq(ctx, ac,
-		                &(commit_info.ac_fifo_credit_spent),
-		                &(commit_info.needs_hdr),
-		                &(commit_info.mac_entry));
-		if (commit_info.p == NULL)
-			break;
-
-		commit_info.pkt_type = (commit_info.needs_hdr) ? eWLFC_PKTTYPE_DELAYED :
-			eWLFC_PKTTYPE_SUPPRESSED;
-
-		rc = _dhd_wlfc_handle_packet_commit(ctx, ac, &commit_info,
-		     fcommit, commit_ctx);
-
-		/* Bus commits may fail (e.g. flow control); abort after retries */
-		if (rc == BCME_OK) {
-			if (commit_info.ac_fifo_credit_spent) {
-				(void) _dhd_wlfc_borrow_credit(ctx, ac_available, ac);
-				credit_count--;
-			}
-		}
-		else {
-			bus_retry_count++;
-			if (bus_retry_count >= BUS_RETRIES) {
-				DHD_ERROR(("dhd_wlfc_commit_packets(): bus error\n"));
-				return rc;
-			}
-		}
-	}
-
-	/* packets from SENDQ are fresh and they'd need header and have no MAC entry */
-	commit_info.needs_hdr = 1;
-	commit_info.mac_entry = NULL;
-	commit_info.pkt_type = eWLFC_PKTTYPE_NEW;
-
-	for (; (credit_count > 0);) {
-
-		commit_info.p = _dhd_wlfc_deque_sendq(ctx, ac);
-		if (commit_info.p == NULL)
-			break;
-
-		rc = _dhd_wlfc_handle_packet_commit(ctx, ac, &commit_info,
-		     fcommit, commit_ctx);
-
-		/* Bus commits may fail (e.g. flow control); abort after retries */
-		if (rc == BCME_OK) {
-			if (commit_info.ac_fifo_credit_spent) {
-				(void) _dhd_wlfc_borrow_credit(ctx, ac_available, ac);
-				credit_count--;
-			}
-		}
-		else {
-			bus_retry_count++;
-			if (bus_retry_count >= BUS_RETRIES) {
-				DHD_ERROR(("dhd_wlfc_commit_packets(): bus error\n"));
-				return rc;
-			}
-		}
-	}
-
 	return BCME_OK;
 }
 
@@ -1754,7 +1638,7 @@ dhd_wlfc_txcomplete(dhd_pub_t *dhd, void *txp, bool success)
 static int
 dhd_wlfc_txstatus_update(dhd_pub_t *dhd, uint8* pkt_info)
 {
-	uint8 	status_flag;
+	uint8	status_flag;
 	uint32	status;
 	int		ret;
 	int		remove_from_hanger = 1;
@@ -2326,6 +2210,9 @@ dhd_wlfc_cleanup(dhd_pub_t *dhd)
 	for (i = 0; i < h->max_items; i++) {
 		if (h->items[i].state == WLFC_HANGER_ITEM_STATE_INUSE) {
 			PKTFREE(wlfc->osh, h->items[i].pkt, TRUE);
+			h->items[i].state = WLFC_HANGER_ITEM_STATE_FREE;
+			h->items[i].pkt = NULL;
+			h->items[i].identifier = 0;
 		}
 	}
 	return;
@@ -2478,7 +2365,7 @@ dhd_prot_hdrpull(dhd_pub_t *dhd, int *ifidx, void *pktbuf, uchar *reorder_buf_in
 	}
 #endif /* PROP_TXSTATUS */
 #if !defined(NDIS630)
-		PKTPULL(dhd->osh, pktbuf, (h->dataOffset << 2));
+	    PKTPULL(dhd->osh, pktbuf, (h->dataOffset << 2));
 #endif
 	return 0;
 }
@@ -2611,7 +2498,7 @@ dhd_get_hostreorder_pkts(void *osh, struct reorder_info *ptr, void **pkt,
 			if (plast == NULL)
 				*pkt = p;
 			else
-				PKTSETNEXT(osh, plast, p);
+				PKTSETNEXT(dhd->osh, plast, p);
 
 			plast = p;
 			pkt_cnt++;

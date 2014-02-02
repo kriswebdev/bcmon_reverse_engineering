@@ -2,14 +2,14 @@
  * Misc utility routines for accessing chip-specific features
  * of the SiliconBackplane-based Broadcom chips.
  *
- * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ * Copyright (C) 1999-2011, Broadcom Corporation
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -17,12 +17,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: siutils.c 328733 2012-04-20 14:49:55Z $
+ * $Id: siutils.c 307724 2012-01-12 10:41:05Z $
  */
 
 #include <bcm_cfg.h>
@@ -53,7 +53,6 @@ static si_info_t *si_doattach(si_info_t *sii, uint devid, osl_t *osh, void *regs
 static bool si_buscore_prep(si_info_t *sii, uint bustype, uint devid, void *sdh);
 static bool si_buscore_setup(si_info_t *sii, chipcregs_t *cc, uint bustype, uint32 savewin,
 	uint *origidx, void *regs);
-
 
 
 /* global variable to indicate reservation/release of gpio's */
@@ -276,7 +275,7 @@ si_buscore_setup(si_info_t *sii, chipcregs_t *cc, uint bustype, uint32 savewin,
 		if (pcie_gen2)
 			sii->pub.buscoretype = PCIE2_CORE_ID;
 		else
-			sii->pub.buscoretype = PCIE_CORE_ID;
+		sii->pub.buscoretype = PCIE_CORE_ID;
 		sii->pub.buscorerev = pcierev;
 		sii->pub.buscoreidx = pcieidx;
 	}
@@ -1131,11 +1130,6 @@ si_watchdog_ms(si_t *sih, uint32 ms)
 	si_watchdog(sih, wd_msticks * ms);
 }
 
-uint32 si_watchdog_msticks(void)
-{
-	return wd_msticks;
-}
-
 bool
 si_taclear(si_t *sih, bool details)
 {
@@ -1943,6 +1937,7 @@ si_socram_srmem_size(si_t *sih)
 	if ((CHIPID(sih->chip) == BCM4334_CHIP_ID) && (CHIPREV(sih->chiprev) < 2)) {
 		return (32 * 1024);
 	}
+
 
 	sii = SI_INFO(sih);
 

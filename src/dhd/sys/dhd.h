@@ -5,13 +5,13 @@
  * DHD OS, bus, and protocol modules.
  *
  * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -19,12 +19,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h 329678 2012-04-26 08:51:32Z $
+ * $Id: dhd.h 309548 2012-01-20 01:13:08Z $
  */
 
 /****************
@@ -34,6 +34,7 @@
 #ifndef _dhd_h_
 #define _dhd_h_
 
+#include "dhd_sec_feature.h"
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -58,6 +59,8 @@ int setScheduler(struct task_struct *p, int policy, struct sched_param *param);
 #include <wlioctl.h>
 #include <wlfc_proto.h>
 
+// For dual support of WCN3660 and BCM4334
+#undef CONFIG_WIRELESS_EXT
 
 /* Forward decls */
 struct dhd_bus;
@@ -74,12 +77,10 @@ enum dhd_bus_state {
 
 /* Firmware requested operation mode */
 #define STA_MASK			0x0001
-#define HOSTAPD_MASK		0x0002
+#define HOSTAPD_MASK			0x0002
 #define WFD_MASK			0x0004
-#define SOFTAP_FW_MASK	0x0008
-#define P2P_GO_ENABLED		0x0010
-#define P2P_GC_ENABLED		0x0020
-#define CONCURENT_MASK		0x00F0
+#define SOFTAP_FW_MASK			0x0008
+#define CONCURRENT_MASK			(STA_MASK | WFD_MASK)
 
 /* max sequential rxcntl timeouts to set HANG event */
 #define MAX_CNTL_TIMEOUT  2
@@ -115,7 +116,13 @@ enum dhd_prealloc_index {
 	DHD_PREALLOC_PROT = 0,
 	DHD_PREALLOC_RXBUF,
 	DHD_PREALLOC_DATABUF,
+#if defined (CUSTOMER_HW_SAMSUNG) && defined (CONFIG_DHD_USE_STATIC_BUF)
+	DHD_PREALLOC_OSL_BUF,
+	DHD_PREALLOC_WIPHY_ESCAN0 = 5,
+	DHD_PREALLOC_WIPHY_ESCAN1
+#else
 	DHD_PREALLOC_OSL_BUF
+#endif
 };
 
 typedef enum  {
@@ -231,19 +238,13 @@ typedef struct dhd_pub {
 	char eventmask[WL_EVENTING_MASK_LEN];
 	int	op_mode;				/* STA, HostAPD, WFD, SoftAP */
 
-/* Set this to 1 to use a seperate interface (p2p0) for p2p operations.
- *  For ICS MR1 releases it should be disable to be compatable with ICS MR1 Framework
- *  see target dhd-cdc-sdmmc-panda-cfg80211-icsmr1-gpl-debug in Makefile
- */
-/* #define WL_ENABLE_P2P_IF		1 */
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
 	struct wake_lock wakelock[WAKE_LOCK_MAX];
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	struct mutex 	wl_start_stop_lock; /* lock/unlock for Android start/stop */
-	struct mutex 	wl_softap_lock;		 /* lock/unlock for any SoftAP/STA settings */
-#endif 
+	struct mutex	wl_start_stop_lock; /* lock/unlock for Android start/stop */
+	struct mutex	wl_softap_lock;		 /* lock/unlock for any SoftAP/STA settings */
+#endif
 
 #ifdef WLBTAMP
 	uint16	maxdatablks;
@@ -253,15 +254,21 @@ typedef struct dhd_pub {
 	void* wlfc_state;
 #endif
 	bool	dongle_isolation;
+	bool	dongle_trap_occured;
 	int   hang_was_sent;
 	int   rxcnt_timeout;		/* counter rxcnt timeout to send HANG */
 	int   txcnt_timeout;		/* counter txcnt timeout to send HANG */
+#ifdef BCM4334_CHIP	
+	int tx_seq_badcnt;
+#endif
 #ifdef WLMEDIA_HTSF
 	uint8 htsfdlystat_sz; /* Size of delay stats, max 255B */
 #endif
 	struct reorder_info *reorder_bufs[WLHOST_REORDERDATA_MAXFLOWS];
+#if defined(PNO_SUPPORT) && defined(CONFIG_HAS_WAKELOCK)
+	struct wake_lock	pno_wakelock;
+#endif
 } dhd_pub_t;
-
 
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 
@@ -273,10 +280,20 @@ typedef struct dhd_pub {
 				SMP_RD_BARRIER_DEPENDS(); \
 				wait_event_interruptible_timeout(a, !dhd_mmc_suspend, HZ/100); \
 			} \
-		} 	while (0)
+		}	while (0)
+#ifdef CUSTOMER_HW_SAMSUNG
+	#define DHD_PM_RESUME_WAIT(a)		_DHD_PM_RESUME_WAIT(a, 500)
+#else
 	#define DHD_PM_RESUME_WAIT(a) 		_DHD_PM_RESUME_WAIT(a, 200)
-	#define DHD_PM_RESUME_WAIT_FOREVER(a) 	_DHD_PM_RESUME_WAIT(a, ~0)
-	#define DHD_PM_RESUME_RETURN_ERROR(a)	do { if (dhd_mmc_suspend) return a; } while (0)
+#endif /* CUSTOMER_HW_SAMSUNG */
+	#define DHD_PM_RESUME_WAIT_FOREVER(a)	_DHD_PM_RESUME_WAIT(a, ~0)
+	#define DHD_PM_RESUME_RETURN_ERROR(a)	do { \
+		if (dhd_mmc_suspend) { \
+			printf("mmc in suspend yet!!!: %s %d\n", \
+					__FUNCTION__, __LINE__); \
+			return a; \
+		} \
+	} while (0)
 	#define DHD_PM_RESUME_RETURN		do { if (dhd_mmc_suspend) return; } while (0)
 
 	#define DHD_SPINWAIT_SLEEP_INIT(a) DECLARE_WAIT_QUEUE_HEAD(a);
@@ -342,10 +359,37 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
 }
 
-#define DHD_OS_WAKE_LOCK(pub) 			dhd_os_wake_lock(pub)
-#define DHD_OS_WAKE_UNLOCK(pub) 		dhd_os_wake_unlock(pub)
+#ifdef DHD_DEBUG_WAKE_LOCK
+#define DHD_OS_WAKE_LOCK(pub) \
+	do { \
+		printf("call wake_lock: %s %d\n", \
+			__FUNCTION__, __LINE__); \
+		dhd_os_wake_lock(pub); \
+	} while (0)
+#define DHD_OS_WAKE_UNLOCK(pub) \
+	do { \
+		printf("call wake_unlock: %s %d\n", \
+			__FUNCTION__, __LINE__); \
+		dhd_os_wake_unlock(pub); \
+	} while (0)
+#define DHD_OS_WAKE_LOCK_TIMEOUT(pub) \
+	do { \
+		printf("call wake_lock_timeout: %s %d\n", \
+			__FUNCTION__, __LINE__); \
+		dhd_os_wake_lock_timeout(pub); \
+	} while (0)
+#define DHD_OS_WAKE_LOCK_TIMEOUT_ENABLE(pub, val) \
+	do { \
+		printf("call wake_lock_timeout_enable[%d]: %s %d\n", \
+			val, __FUNCTION__, __LINE__); \
+		dhd_os_wake_lock_timeout_enable(pub, val); \
+	} while (0)
+#else
+#define DHD_OS_WAKE_LOCK(pub)			dhd_os_wake_lock(pub)
+#define DHD_OS_WAKE_UNLOCK(pub)			dhd_os_wake_unlock(pub)
 #define DHD_OS_WAKE_LOCK_TIMEOUT(pub)		dhd_os_wake_lock_timeout(pub)
 #define DHD_OS_WAKE_LOCK_TIMEOUT_ENABLE(pub, val)	dhd_os_wake_lock_timeout_enable(pub, val)
+#endif /* DHD_DEBUG_WAKE_LOCK */
 #define DHD_PACKET_TIMEOUT_MS	1000
 #define DHD_EVENT_TIMEOUT_MS	1500
 
@@ -379,7 +423,7 @@ typedef enum dhd_attach_states
 } dhd_attach_states_t;
 
 /* Value -1 means we are unsuccessful in creating the kthread. */
-#define DHD_PID_KT_INVALID 	-1
+#define DHD_PID_KT_INVALID	-1
 /* Value -2 means we are unsuccessful in both creating the kthread and tasklet */
 #define DHD_PID_KT_TL_INVALID	-2
 
@@ -529,8 +573,7 @@ extern uint dhd_bus_status(dhd_pub_t *dhdp);
 extern int  dhd_bus_start(dhd_pub_t *dhdp);
 extern int dhd_bus_membytes(dhd_pub_t *dhdp, bool set, uint32 address, uint8 *data, uint size);
 extern void dhd_print_buf(void *pbuf, int len, int bytes_per_line);
-extern bool dhd_is_associated(dhd_pub_t *dhd, void *bss_buf);
-extern uint dhd_bus_chip_id(dhd_pub_t *dhdp);
+extern bool dhd_is_associated(dhd_pub_t *dhd, void *bss_buf, int *retval);
 
 #if defined(KEEP_ALIVE)
 extern int dhd_keep_alive_onoff(dhd_pub_t *dhd);
@@ -603,7 +646,11 @@ extern uint dhd_sdiod_drive_strength;
 /* Override to force tx queueing all the time */
 extern uint dhd_force_tx_queueing;
 /* Default KEEP_ALIVE Period is 55 sec to prevent AP from sending Keep Alive probe frame */
+#ifdef KEEP_ALIVE_PACKET_PERIOD_30_SEC
+#define KEEP_ALIVE_PERIOD 30000
+#else /* KEEP_ALIVE_PACKET_PERIOD_30_SEC */
 #define KEEP_ALIVE_PERIOD 55000
+#endif /* KEEP_ALIVE_PACKET_PERIOD_30_SEC */
 #define NULL_PKT_STR	"null_pkt"
 
 #ifdef SDTEST
@@ -627,6 +674,21 @@ extern char fw_path2[MOD_PARAM_PATHLEN];
 
 /* Flag to indicate if we should download firmware on driver load */
 extern uint dhd_download_fw_on_driverload;
+
+#if defined(WL_CFG80211) && defined(CUSTOMER_HW_SAMSUNG)
+/* CSP#505233: Flags to indicate if we distingish power off policy when
+ * user set the memu "Keep Wi-Fi on during sleep" to "Never"
+ */
+extern int sleep_never;
+int dhd_deepsleep(struct net_device *dev, int flag);
+#endif /* WL_CFG80211 && CUSTOMER_HW_SAMSUNG */
+
+#ifdef BCM4334_CHECK_CHIP_REV
+/* Check chip revision */
+extern uint g_chipver;
+extern char chipver_tag[4];
+extern char fw_down_path[MOD_PARAM_PATHLEN];
+#endif
 
 /* For supporting multiple interfaces */
 #define DHD_MAX_IFS	16
@@ -785,5 +847,10 @@ void dhd_aoe_arp_clr(dhd_pub_t *dhd);
 int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen);
 void dhd_arp_offload_add_ip(dhd_pub_t *dhd, uint32 ipaddr);
 #endif /* ARP_OFFLOAD_SUPPORT */
+
+#ifdef RDWR_KORICS_MACADDR
+extern int
+dhd_write_rdwr_korics_macaddr(struct dhd_info *dhd, struct ether_addr *mac);
+#endif
 
 #endif /* _dhd_h_ */

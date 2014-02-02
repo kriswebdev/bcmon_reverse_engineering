@@ -2,13 +2,13 @@
  * Linux cfg80211 driver - Dongle Host Driver (DHD) related
  *
  * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -16,7 +16,7 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
@@ -46,12 +46,6 @@ extern void dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable,
 
 static int dhd_dongle_up = FALSE;
 
-#include <dngl_stats.h>
-#include <dhd.h>
-#include <dhdioctl.h>
-#include <wlioctl.h>
-#include <dhd_cfg80211.h>
-
 static s32 wl_dongle_up(struct net_device *ndev, u32 up);
 
 /**
@@ -73,36 +67,6 @@ s32 dhd_cfg80211_deinit(struct wl_priv *wl)
 s32 dhd_cfg80211_down(struct wl_priv *wl)
 {
 	dhd_dongle_up = FALSE;
-	return 0;
-}
-
-s32 dhd_cfg80211_set_p2p_info(struct wl_priv *wl, int val)
-{
-	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
-	dhd->op_mode |= val;
-	WL_ERR(("Set : op_mode=%d\n", dhd->op_mode));
-
-#ifdef ARP_OFFLOAD_SUPPORT
-	/* IF P2P is enabled, disable arpoe */
-	dhd_arp_offload_set(dhd, 0);
-	dhd_arp_offload_enable(dhd, false);
-#endif /* ARP_OFFLOAD_SUPPORT */
-
-	return 0;
-}
-
-s32 dhd_cfg80211_clean_p2p_info(struct wl_priv *wl)
-{
-	dhd_pub_t *dhd =  (dhd_pub_t *)(wl->pub);
-	dhd->op_mode &= ~CONCURENT_MASK;
-	WL_ERR(("Clean : op_mode=%d\n", dhd->op_mode));
-
-#ifdef ARP_OFFLOAD_SUPPORT
-	/* IF P2P is disabled, enable arpoe back for STA mode. */
-	dhd_arp_offload_set(dhd, dhd_arp_mode);
-	dhd_arp_offload_enable(dhd, true);
-#endif /* ARP_OFFLOAD_SUPPORT */
-
 	return 0;
 }
 
@@ -516,7 +480,7 @@ void wl_cfg80211_btcoex_deinit(struct wl_priv *wl)
 	kfree(wl->btcoex_info);
 	wl->btcoex_info = NULL;
 }
-#endif 
+#endif /* COEX_DHCP */
 
 int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 {
@@ -543,23 +507,36 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 	int i;
 #endif
 
+#ifdef PASS_ALL_MCAST_PKTS
+		char iovbuf[20];
+		uint32 allmultivar = 0;
+#endif
+
 	/* Figure out powermode 1 or o command */
 	strncpy((char *)&powermode_val, command + strlen("BTCOEXMODE") +1, 1);
+	WL_ERR(("%s: DHCP session Enter\n", __FUNCTION__));
 
 	if (strnicmp((char *)&powermode_val, "1", strlen("1")) == 0) {
 
-		WL_TRACE(("%s: DHCP session starts\n", __FUNCTION__));
+		WL_ERR(("%s: DHCP session starts\n", __FUNCTION__));
 
 #ifdef PKT_FILTER_SUPPORT
 		dhd->dhcp_in_progress = 1;
 
 		/* Disable packet filtering */
 		if (dhd_pkt_filter_enable && dhd->early_suspended) {
-			WL_TRACE(("DHCP in progressing , disable packet filter!!!\n"));
+			WL_ERR(("DHCP in progressing , disable packet filter!!!\n"));
 			for (i = 0; i < dhd->pktfilter_count; i++) {
 				dhd_pktfilter_offload_enable(dhd, dhd->pktfilter[i],
-				 0, dhd_master_mode);
+					0, dhd_master_mode);
 			}
+			
+#ifdef PASS_ALL_MCAST_PKTS
+						allmultivar = 1;
+						bcm_mkiovar("allmulti", (char *)&allmultivar, 4, iovbuf, sizeof(iovbuf));
+						dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+						WL_ERR(("DHCP is progressing , allmulti value = %d \n", allmultivar));
+#endif /* PASS_ALL_MCAST_PKTS */
 		}
 #endif
 
@@ -606,17 +583,24 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, char *command)
 	}
 	else if (strnicmp((char *)&powermode_val, "2", strlen("2")) == 0) {
 
-
 #ifdef PKT_FILTER_SUPPORT
-		dhd->dhcp_in_progress = 0;
+        dhd->dhcp_in_progress = 0;
+	WL_ERR(("%s: DHCP is complete \n", __FUNCTION__));
 
 		/* Enable packet filtering */
 		if (dhd_pkt_filter_enable && dhd->early_suspended) {
-			WL_TRACE(("DHCP is complete , enable packet filter!!!\n"));
+			WL_ERR(("DHCP is complete , enable packet filter!!!\n"));
 			for (i = 0; i < dhd->pktfilter_count; i++) {
 				dhd_pktfilter_offload_enable(dhd, dhd->pktfilter[i],
-				 1, dhd_master_mode);
+					1, dhd_master_mode);
 			}
+
+#ifdef PASS_ALL_MCAST_PKTS
+			allmultivar = 0;
+			bcm_mkiovar("allmulti", (char *)&allmultivar, 4, iovbuf, sizeof(iovbuf));
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+			WL_ERR(("DHCP is complete , allmulti value = %d \n", allmultivar));
+#endif /* PASS_ALL_MCAST_PKTS */
 		}
 #endif
 

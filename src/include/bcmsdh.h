@@ -3,14 +3,14 @@
  *     export functions to client drivers
  *     abstract OS and BUS specific details of SDIO
  *
- * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ * Copyright (C) 1999-2011, Broadcom Corporation
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -18,12 +18,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdh.h 327460 2012-04-13 18:38:41Z $
+ * $Id: bcmsdh.h 299859 2011-12-01 03:53:27Z $
  */
 
 /**
@@ -56,7 +56,7 @@ typedef void (*bcmsdh_cb_fn_t)(void *);
  *    most recent one) to enable single-instance implementations to pass NULL.
  */
 
-#if 0 && (NDISVER >= 0x0630) && 1
+#if defined(NDIS630)
 extern bcmsdh_info_t *bcmsdh_attach(osl_t *osh, void *cfghdl,
 	void **regsva, uint irq, shared_info_t *sh);
 #else
