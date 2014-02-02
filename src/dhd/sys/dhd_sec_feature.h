@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Header file describing the internal (inter-module) DHD interfaces.
  *
  * Provides type definitions and function prototypes used to link the
@@ -35,34 +35,24 @@
 /* PROJECTS */
 
 #if defined(CONFIG_MACH_SAMSUNG_ESPRESSO)\
-	|| defined(CONFIG_MACH_SAMSUNG_ESPRESSO_10)\
-		|| defined(CONFIG_MACH_SAMSUNG_ESPRESSO_CHN_CMCC)
+	|| defined(CONFIG_MACH_SAMSUNG_ESPRESSO_10)
 #define READ_MACADDR
 #define HW_OOB
 #endif
 
 #ifdef CONFIG_MACH_U1 /* Q1 also uses this feature */
+#ifdef CONFIG_MACH_Q1_BD
+#define HW_OOB
+#endif
 #define USE_CID_CHECK
 #define WRITE_MACADDR
-#endif
-
-#ifdef CONFIG_MACH_SAMSUNG_T1
-#define USE_CID_CHECK
-#define WRITE_MACADDR
-#endif
-
-/* Temporary roaming undef of D2_ATT models for the ATT hotspot connection problem */
-#if defined (CONFIG_MACH_M2_ATT)
-#undef ROAM_ENABLE
-#undef ROAM_CHANNEL_CACHE
-#undef ROAM_API
 #endif
 
 /* REGION CODE */
 
 #if (WLAN_REGION_CODE >= 100) && (WLAN_REGION_CODE < 200) /*EUR*/
 #if (WLAN_REGION_CODE == 101) /*EUR ORG*/
-/* GAN LITE NAT KEEPALIVE FILTER */
+;/* GAN LITE NAT KEEPALIVE FILTER */
 #define GAN_LITE_NAT_KEEPALIVE_FILTER
 #endif
 #endif

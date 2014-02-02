@@ -27,17 +27,15 @@ DHDCFLAGS += -DWL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST
 DHDCFLAGS += -DDHD_USE_IDLECOUNT
 endif
 ifeq ($(CONFIG_BCM4330),m)
-DHDCFLAGS += -DBCM4330_CHIP -DHW_OOB
+DHDCFLAGS += -DBCM4330_CHIP
 DHDCFLAGS += -DMCAST_LIST_ACCUMULATION
 DHDCFLAGS += -DCONFIG_CONTROL_PM
-DHDCFLAGS += -DDHD_USE_IDLECOUNT
 endif
 
 ifeq ($(CONFIG_BCM4330),y)
 DHDCFLAGS += -DBCM4330_CHIP
 DHDCFLAGS += -DMCAST_LIST_ACCUMULATION
 DHDCFLAGS += -DCONFIG_CONTROL_PM
-DHDCFLAGS += -DDHD_USE_IDLECOUNT
 endif
 ifeq ($(CONFIG_BCM43241),m)
 DHDCFLAGS += -DBCM43241_CHIP -DHW_OOB
@@ -68,6 +66,9 @@ DHDCFLAGS +=-DINITIAL_2G_SCAN_BY_ESCAN
 # For Scan result patch
 DHDCFLAGS += -DESCAN_RESULT_PATCH
 
+ifeq ($(CONFIG_MACH_SAMSUNG_T1),y)
+DHDCFLAGS += -DUSE_CID_CHECK -DWRITE_MACADDR
+endif
 
 DHDCFLAGS += -DROAM_ENABLE -DROAM_CHANNEL_CACHE -DROAM_API
 
@@ -77,7 +78,7 @@ DHDCFLAGS += -DCONFIG_DHD_USE_STATIC_BUF
 endif
 
 # For CCX
-ifeq ($(CONFIG_BRCM_CCX),y)
+ifneq ($(CONFIG_TARGET_LOCALE_KOR),y)
 DHDCFLAGS += -DBCMCCX
 endif
 
@@ -154,7 +155,8 @@ dhd-y := src/bcmsdio/sys/bcmsdh.o	src/bcmsdio/sys/bcmsdh_linux.o \
 	 src/shared/sbutils.o		src/shared/siutils.o \
 	 src/wl/sys/wl_android.o	src/wl/sys/wl_cfg80211.o \
 	 src/wl/sys/wl_cfgp2p.o		src/wl/sys/wldev_common.o \
-	 src/wl/sys/wl_linux_mon.o	src/wl/sys/wl_roam.o
+	 src/wl/sys/wl_linux_mon.o	src/wl/sys/wl_roam.o \
+	 src/dhd/sys/bcmon.o
 
 all:
 	@echo "$(MAKE) --no-print-directory -C $(KDIR) SUBDIRS=$(CURDIR) modules"

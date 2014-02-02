@@ -186,7 +186,6 @@ char fw_down_path[MOD_PARAM_PATHLEN];
 #define	GPIO_DEV_WAKEUP			17	/* Host gpio17 mapped to device gpio1 wakeup */
 #define	CC_CHIPCTRL2_GPIO1_WAKEUP	(1  << 0)
 
-
 /* Private data for SDIO bus interaction */
 typedef struct dhd_bus {
 	dhd_pub_t	*dhd;
@@ -2252,7 +2251,7 @@ dhdsdio_devram_remap(dhd_bus_t *bus, bool val)
 	si_socdevram(bus->sih, TRUE, &enable, &protect, &remap);
 }
 
-static int
+int
 dhdsdio_membytes(dhd_bus_t *bus, bool write, uint32 address, uint8 *data, uint size)
 {
 	int bcmerror = 0;
@@ -4645,11 +4644,22 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 			}
 
 			/* Check window for sanity */
+#ifdef BCM4334_CHIP			
+			if ((uint8)(txmax - bus->tx_seq) > 0x40) {
+					DHD_ERROR(("%s: got unlikely tx max %d with tx_seq %d\n",
+						__FUNCTION__, txmax, bus->tx_seq));
+					txmax = bus->tx_max;
+					bus->dhd->tx_seq_badcnt++;
+			}
+			else
+				bus->dhd->tx_seq_badcnt = 0;
+#else
 			if ((uint8)(txmax - bus->tx_seq) > 0x40) {
 					DHD_ERROR(("%s: got unlikely tx max %d with tx_seq %d\n",
 						__FUNCTION__, txmax, bus->tx_seq));
 					txmax = bus->tx_max;
 			}
+#endif
 			bus->tx_max = txmax;
 
 #ifdef DHD_DEBUG
@@ -4802,11 +4812,22 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 		}
 
 		/* Check window for sanity */
+#ifdef BCM4334_CHIP			
+		if ((uint8)(txmax - bus->tx_seq) > 0x40) {
+			DHD_ERROR(("%s: got unlikely tx max %d with tx_seq %d\n",
+			           __FUNCTION__, txmax, bus->tx_seq));
+			txmax = bus->tx_max;
+			bus->dhd->tx_seq_badcnt++;
+		}
+		else
+			bus->dhd->tx_seq_badcnt = 0;
+#else
 		if ((uint8)(txmax - bus->tx_seq) > 0x40) {
 			DHD_ERROR(("%s: got unlikely tx max %d with tx_seq %d\n",
 			           __FUNCTION__, txmax, bus->tx_seq));
 			txmax = bus->tx_max;
 		}
+#endif
 		bus->tx_max = txmax;
 
 		/* Call a separate function for control frames */
@@ -4909,6 +4930,16 @@ deliver:
 				DHD_ERROR(("%s: glom superframe w/o descriptor!\n", __FUNCTION__));
 				dhdsdio_rxfail(bus, FALSE, FALSE);
 			}
+			continue;
+		}
+
+		if(chan==0xf)
+		{
+			//PKTSETLEN(osh, pkt, len+14);
+			//PKTPULL(osh, pkt, doff);
+			dhd_os_sdunlock(bus->dhd);
+			dhd_rx_frame(bus->dhd, ifidx, pkt, 1, chan);
+			dhd_os_sdlock(bus->dhd);
 			continue;
 		}
 
@@ -5796,8 +5827,10 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 				if (bus->dhd_idlecount >= (DHD_IDLE_TIMEOUT_MS/dhd_watchdog_ms)) {
 					DHD_TIMER(("%s: DHD Idle state!!\n", __FUNCTION__));
 
-					if (SLPAUTO_ENAB(bus))
-						dhdsdio_bussleep(bus, TRUE);
+					if (SLPAUTO_ENAB(bus)) {
+						if (dhdsdio_bussleep(bus, TRUE) != BCME_BUSY)
+							dhd_os_wd_timer(bus->dhd, 0);
+					}
 					else
 						dhdsdio_clkctl(bus, CLK_NONE, FALSE);
 

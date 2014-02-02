@@ -80,6 +80,7 @@ enum dhd_bus_state {
 #define HOSTAPD_MASK			0x0002
 #define WFD_MASK			0x0004
 #define SOFTAP_FW_MASK			0x0008
+#define CONCURRENT_MASK			(STA_MASK | WFD_MASK)
 
 /* max sequential rxcntl timeouts to set HANG event */
 #define MAX_CNTL_TIMEOUT  2
@@ -253,10 +254,13 @@ typedef struct dhd_pub {
 	void* wlfc_state;
 #endif
 	bool	dongle_isolation;
-	bool	dongle_trap_occured;	/* flag for forcible sending HANG event whenever trap occured */
+	bool	dongle_trap_occured;
 	int   hang_was_sent;
 	int   rxcnt_timeout;		/* counter rxcnt timeout to send HANG */
 	int   txcnt_timeout;		/* counter txcnt timeout to send HANG */
+#ifdef BCM4334_CHIP	
+	int tx_seq_badcnt;
+#endif
 #ifdef WLMEDIA_HTSF
 	uint8 htsfdlystat_sz; /* Size of delay stats, max 255B */
 #endif
@@ -278,9 +282,9 @@ typedef struct dhd_pub {
 			} \
 		}	while (0)
 #ifdef CUSTOMER_HW_SAMSUNG
-	#define DHD_PM_RESUME_WAIT(a)       _DHD_PM_RESUME_WAIT(a, 500)
+	#define DHD_PM_RESUME_WAIT(a)		_DHD_PM_RESUME_WAIT(a, 500)
 #else
-	#define DHD_PM_RESUME_WAIT(a)		_DHD_PM_RESUME_WAIT(a, 200)
+	#define DHD_PM_RESUME_WAIT(a) 		_DHD_PM_RESUME_WAIT(a, 200)
 #endif /* CUSTOMER_HW_SAMSUNG */
 	#define DHD_PM_RESUME_WAIT_FOREVER(a)	_DHD_PM_RESUME_WAIT(a, ~0)
 	#define DHD_PM_RESUME_RETURN_ERROR(a)	do { \

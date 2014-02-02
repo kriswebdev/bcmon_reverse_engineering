@@ -77,14 +77,13 @@
 #define CMD_P2P_SET_PS		"P2P_SET_PS"
 #define CMD_SET_AP_WPS_P2P_IE		"SET_AP_WPS_P2P_IE"
 
+
 /* Hostapd private command */
 #define CMD_SET_HAPD_AUTO_CHANNEL	"HAPD_AUTO_CHANNEL"
 #define CMD_SET_HAPD_MAX_NUM_STA	"HAPD_MAX_NUM_STA"
 #define CMD_SET_HAPD_SSID			"HAPD_SSID"
 #define CMD_SET_HAPD_HIDE_SSID		"HAPD_HIDE_SSID"
 #define CMD_HAPD_STA_DISASSOC		"HAPD_STA_DISASSOC"
-
-/* CCX Private Commands */
 #ifdef BCMCCX
 #define CMD_GETCCKM_RN		"get cckm_rn"
 #define CMD_SETCCKM_KRK		"set cckm_krk"
@@ -128,11 +127,11 @@ typedef struct cmd_tlv {
 #ifdef OKC_SUPPORT
 #define CMD_OKC_SET_PMK		"SET_PMK"
 #define CMD_OKC_ENABLE		"OKC_ENABLE"
-#endif /* OKC_SUPPORT */
+#endif
 
-#ifdef CUSTOMER_HW_SAMSUNG
+#ifdef BCM4334_CHIP		//ampdu_mpdu
 #define CMD_AMPDU_MPDU "AMPDU_MPDU"
-#endif /* CUSTOMER_HW_SAMSUNG */
+#endif
 
 typedef struct android_wifi_priv_cmd {
 	char *buf;
@@ -231,19 +230,19 @@ static int wl_android_set_suspendopt(struct net_device *dev, char *command, int 
 #ifdef CUSTOMER_HW_SAMSUNG
 	if (!dhd_download_fw_on_driverload) {
 #endif /* CUSTOMER_HW_SAMSUNG */
-	suspend_flag = *(command + strlen(CMD_SETSUSPENDOPT) + 1) - '0';
-
-	if (suspend_flag != 0)
-		suspend_flag = 1;
-	ret_now = net_os_set_suspend_disable(dev, suspend_flag);
-
-	if (ret_now != suspend_flag) {
-		if (!(ret = net_os_set_suspend(dev, ret_now)))
-			DHD_INFO(("%s: Suspend Flag %d -> %d\n",
-				__FUNCTION__, ret_now, suspend_flag));
-		else
-			DHD_ERROR(("%s: failed %d\n", __FUNCTION__, ret));
-	}
+		suspend_flag = *(command + strlen(CMD_SETSUSPENDOPT) + 1) - '0';
+	
+		if (suspend_flag != 0)
+			suspend_flag = 1;
+		ret_now = net_os_set_suspend_disable(dev, suspend_flag);
+	
+		if (ret_now != suspend_flag) {
+			if (!(ret = net_os_set_suspend(dev, ret_now)))
+				DHD_INFO(("%s: Suspend Flag %d -> %d\n",
+					__FUNCTION__, ret_now, suspend_flag));
+			else
+				DHD_ERROR(("%s: failed %d\n", __FUNCTION__, ret));
+		}
 #ifdef CUSTOMER_HW_SAMSUNG
 	}
 #endif /* CUSTOMER_HW_SAMSUNG */
@@ -536,87 +535,85 @@ static int wl_android_get_p2p_dev_addr(struct net_device *ndev, char *command, i
 	bytes_written = sizeof(struct ether_addr);
 	return bytes_written;
 }
-
 #ifdef BCMCCX
 static int wl_android_get_cckm_rn(struct net_device *dev, char *command)
 {
-	int error, rn;
+        int error, rn;
 
-	WL_TRACE(("%s:wl_android_get_cckm_rn\n", dev->name));
+        WL_TRACE(("%s:wl_android_get_cckm_rn\n", dev->name));
 
-	error = wldev_iovar_getint(dev, "cckm_rn", &rn);
-	if (unlikely(error)) {
-		WL_ERR(("wl_android_get_cckm_rn error (%d)\n", error));
-		return -1;
-	}
+        error = wldev_iovar_getint(dev, "cckm_rn", &rn);
+        if (unlikely(error)) {
+                WL_ERR(("wl_android_get_cckm_rn error (%d)\n", error));
+                return -1;
+        }
 	//WL_ERR(("wl_android_get_cckm_rn = %d\n", rn));
-	memcpy(command, &rn, sizeof(int));
+        memcpy(command, &rn, sizeof(int));
 
-	return sizeof(int);
+        return sizeof(int);
 }
 
 static int wl_android_set_cckm_krk(struct net_device *dev, char *command)
 {
-	int error;
-	unsigned char key[16];
+        int error;
+        unsigned char key[16];
 
-	static char iovar_buf[WLC_IOCTL_MEDLEN];
+        static char iovar_buf[WLC_IOCTL_MEDLEN];
 
-	WL_TRACE(("%s: wl_iw_set_cckm_krk\n", dev->name));
+        WL_TRACE(("%s: wl_iw_set_cckm_krk\n", dev->name));
 
-	memset(iovar_buf, 0, sizeof(iovar_buf));
-	memcpy(key, command+strlen("set cckm_krk")+1, 16);
+        memset(iovar_buf, 0, sizeof(iovar_buf));
+        memcpy(key, command+strlen("set cckm_krk")+1, 16);
 
-	error = wldev_iovar_setbuf(dev, "cckm_krk",key, sizeof(key), iovar_buf, WLC_IOCTL_MEDLEN,NULL);
-	if (unlikely(error))
-	{
-		WL_ERR((" cckm_krk set error (%d)\n", error));
-		return -1;
-	}
-	return 0;
+        error = wldev_iovar_setbuf(dev,"cckm_krk", key, sizeof(key), iovar_buf, WLC_IOCTL_MEDLEN, NULL);
+        if (unlikely(error))
+        {
+                WL_ERR((" cckm_krk set error (%d)\n", error));
+                return -1;
+        }
+        return 0;
 }
-
 static int wl_android_get_assoc_res_ies(struct net_device *dev, char *command)
 {
-	int error;
-	u8 buf[WL_ASSOC_INFO_MAX];
-	wl_assoc_info_t assoc_info;
-	u32 resp_ies_len = 0;
-	int bytes_written = 0;
+        int error;
+        u8 buf[WL_ASSOC_INFO_MAX];
+        wl_assoc_info_t assoc_info;
+        u32 resp_ies_len = 0;
+        int bytes_written = 0;
 
-	WL_TRACE(("%s: wl_iw_get_assoc_res_ies\n", dev->name));
+        WL_TRACE(("%s: wl_iw_get_assoc_res_ies\n", dev->name));
 
-	error = wldev_iovar_getbuf(dev, "assoc_info", NULL, 0, buf,WL_ASSOC_INFO_MAX, NULL);
-	if (unlikely(error)) {
-		WL_ERR(("could not get assoc info (%d)\n", error));
-		return -1;
-	}
+        error = wldev_iovar_getbuf(dev, "assoc_info", NULL, 0, buf, WL_ASSOC_INFO_MAX, NULL);
+        if (unlikely(error)) {
+                WL_ERR(("could not get assoc info (%d)\n", error));
+                return -1;
+        }
 
-	memcpy(&assoc_info, buf, sizeof(wl_assoc_info_t));
-	assoc_info.req_len = htod32(assoc_info.req_len);
-	assoc_info.resp_len = htod32(assoc_info.resp_len);
-	assoc_info.flags = htod32(assoc_info.flags);
+        memcpy(&assoc_info, buf, sizeof(wl_assoc_info_t));
+        assoc_info.req_len = htod32(assoc_info.req_len);
+        assoc_info.resp_len = htod32(assoc_info.resp_len);
+        assoc_info.flags = htod32(assoc_info.flags);
 
-	if (assoc_info.resp_len) {
-		resp_ies_len = assoc_info.resp_len - sizeof(struct dot11_assoc_resp);
-	}
+        if (assoc_info.resp_len) {
+                resp_ies_len = assoc_info.resp_len - sizeof(struct dot11_assoc_resp);
+        }
 
-	/* first 4 bytes are ie len */
-	memcpy(command, &resp_ies_len, sizeof(u32));
-	bytes_written= sizeof(u32);
+        /* first 4 bytes are ie len */
+        memcpy(command, &resp_ies_len, sizeof(u32));
+        bytes_written= sizeof(u32);
 
-	/* get the association resp IE's if there are any */
-	if (resp_ies_len) {
-		error = wldev_iovar_getbuf(dev, "assoc_resp_ies", NULL, 0, buf,WL_ASSOC_INFO_MAX, NULL);
-		if (unlikely(error)) {
-			WL_ERR(("could not get assoc resp_ies (%d)\n", error));
-			return -1;
-		}
+        /* get the association resp IE's if there are any */
+        if (resp_ies_len) {
+                error = wldev_iovar_getbuf(dev, "assoc_resp_ies", NULL, 0, buf, WL_ASSOC_INFO_MAX, NULL);
+                if (unlikely(error)) {
+                        WL_ERR(("could not get assoc resp_ies (%d)\n", error));
+                        return -1;
+                }
 
-		memcpy(command+sizeof(u32), buf, resp_ies_len);
-		bytes_written += resp_ies_len;
-	}
-	return bytes_written;
+                memcpy(command+sizeof(u32), buf, resp_ies_len);
+                bytes_written += resp_ies_len;
+        }
+        return bytes_written;
 }
 
 #endif /* BCMCCX */
@@ -899,31 +896,30 @@ wl_android_okc_enable(struct net_device *dev, char *command, int total_len)
 
 #endif /* OKC_ SUPPORT */
 
-#ifdef CUSTOMER_HW_SAMSUNG
-/* CMD_AMPDU_MPDU */
+#ifdef BCM4334_CHIP		//ampdu_mpdu
 static int
 wl_android_set_ampdu_mpdu(struct net_device *dev, const char* string_num)
 {
 	int err = 0;
 	int ampdu_mpdu;
 
+	//ampdu_mpdu = my_atoi(string_num);
 	ampdu_mpdu = bcm_atoi(string_num);
 
 	if (ampdu_mpdu > 32) {
 		DHD_ERROR(("%s : ampdu_mpdu MAX value is 32.\n", __FUNCTION__));
 		return -1;
 	}
-
 	DHD_ERROR(("%s : ampdu_mpdu = %d\n", __FUNCTION__, ampdu_mpdu));
 	err = wldev_iovar_setint(dev, "ampdu_mpdu", ampdu_mpdu);
 	if (err < 0) {
 		DHD_ERROR(("%s : ampdu_mpdu set error. %d\n", __FUNCTION__, err));
 		return -1;
 	}
-
+	
 	return 0;
 }
-#endif /* CUSTOMER_HW_SAMSUNG*/
+#endif
 
 int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
@@ -1017,11 +1013,12 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	}
 	else if (strnicmp(command, CMD_BTCOEXMODE, strlen(CMD_BTCOEXMODE)) == 0) {
 		uint mode = *(command + strlen(CMD_BTCOEXMODE) + 1) - '0';
-
+#if 0
 		if (mode == 1)
 			net_os_set_packet_filter(net, 0); /* DHCP starts */
 		else
 			net_os_set_packet_filter(net, 1); /* DHCP ends */
+#endif
 #ifdef WL_CFG80211
 		bytes_written = wl_cfg80211_set_btcoex_dhcp(net, command);
 #endif
@@ -1159,13 +1156,12 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		bytes_written = wl_android_get_assoc_res_ies(net, command);
 	}
 #endif /* BCMCCX */
-#ifdef CUSTOMER_HW_SAMSUNG
-	/* CMD_AMPDU_MPDU */
+#ifdef BCM4334_CHIP		//ampdu_mpdu
 	else if (strnicmp(command, CMD_AMPDU_MPDU,strlen(CMD_AMPDU_MPDU)) == 0) {
 		int skip = strlen(CMD_AMPDU_MPDU) + 1;
 		bytes_written = wl_android_set_ampdu_mpdu(net, (const char*)command+skip);
 	}
-#endif /* CUSTOMER_HW_SAMSUNG */
+#endif
 	else {
 		if ((strnicmp(command, CMD_START, strlen(CMD_START)) != 0) &&
 			(strnicmp(command, CMD_SETFWPATH, strlen(CMD_SETFWPATH)) != 0))
