@@ -69,6 +69,8 @@
 #include <dhd_bta.h>
 #endif
 
+#include "bcmon.h"
+
 #ifdef WLMEDIA_HTSF
 #include <linux/time.h>
 #include <htsf.h>
@@ -607,12 +609,15 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
+	char iovbuf[32];
 #ifndef CUSTOMER_HW_SAMSUNG
 	int power_mode = PM_MAX;
 	/* wl_pkt_filter_enable_t	enable_parm; */
-	char iovbuf[32];
 	int bcn_li_dtim = 3;
 	uint roamvar = 1;
+#endif
+#ifdef BCM4334_CHIP
+	int bcn_li_bcn;
 #endif
 
 	DHD_ERROR(("%s: enter, value = %d in_suspend=%d\n",
@@ -651,6 +656,12 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 				iovbuf, sizeof(iovbuf));
 			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 #endif
+#ifdef BCM4334_CHIP
+			bcn_li_bcn = 0;
+			bcm_mkiovar("bcn_li_bcn", (char *)&bcn_li_bcn,
+				4, iovbuf, sizeof(iovbuf));
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+#endif
 		} else {
 
 #ifdef PKT_FILTER_SUPPORT
@@ -679,6 +690,12 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 			roamvar = dhd_roam_disable;
 			bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf,
 				sizeof(iovbuf));
+			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+#endif
+#ifdef BCM4334_CHIP
+			bcn_li_bcn = 1;
+			bcm_mkiovar("bcn_li_bcn", (char *)&bcn_li_bcn,
+				4, iovbuf, sizeof(iovbuf));
 			dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
 #endif
 		}
@@ -1776,20 +1793,38 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 
 		ASSERT(ifp);
 		skb->dev = ifp->net;
+
+		if (chan==15) {
+			skb = bcmon_decode_skb(skb);
+			if(skb==0)
+			{
+				return;
+			}
+		}
+		else {
+			PKTFREE(dhdp->osh, skb, FALSE);
+			return;
+		}
+
 		skb->protocol = eth_type_trans(skb, skb->dev);
 
 		if (skb->pkt_type == PACKET_MULTICAST) {
 			dhd->pub.rx_multicast++;
 		}
 
-		skb->data = eth;
-		skb->len = len;
+		if (chan != 15)
+		{
+			skb->data = eth;
+			skb->len = len;
+		}
 
 #ifdef WLMEDIA_HTSF
 		dhd_htsf_addrxts(dhdp, pktbuf);
 #endif
-		/* Strip header, count, deliver upward */
-		skb_pull(skb, ETH_HLEN);
+		if (chan != 15) {
+			/* Strip header, count, deliver upward */
+			skb_pull(skb, ETH_HLEN);
+		}
 
 		/* Process special event packets and then discard them */
 		if (ntoh16(skb->protocol) == ETHER_TYPE_BRCM) {
@@ -3373,6 +3408,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	uint32 dongle_align = DHD_SDALIGN;
 #if defined(BCM4334_CHIP)
 	uint32 glom = 5; /* 2012.02.21 for perfomance */
+	uint32 bcn_li_bcn = 1;
 #elif defined(BCM43241_CHIP)
 	uint32 glom = 1;
 #else
@@ -3727,6 +3763,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #ifdef OKC_DEBUG
 	setbit(eventmask, WLC_E_ROAM_START);
 #endif /* OKC_DEBUG */
+#ifdef CUSTOMER_HW_SAMSUNG
+	clrbit(eventmask, WLC_E_TXFAIL);
+#endif
 
 	/* Write updated Event mask */
 	bcm_mkiovar("event_msgs", eventmask, WL_EVENTING_MASK_LEN, iovbuf, sizeof(iovbuf));
@@ -3759,31 +3798,10 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 
 #ifdef PKT_FILTER_SUPPORT
 	/* Setup defintions for pktfilter , enable in suspend */
-	dhd->pktfilter_count = 4;
-#ifdef GAN_LITE_NAT_KEEPALIVE_FILTER
-	/* Setup filter to block broadcast and NAT Keepalive packets */
-	dhd->pktfilter[0] = "100 0 0 0 0xffffff 0xffffff"; /* discard all broadcast packets */
-	dhd->pktfilter[1] = "102 0 0 36 0xffffffff 0x11940009"; /* discard NAT Keepalive packets */
-	dhd->pktfilter[2] = "104 0 0 38 0xffffffff 0x11940009"; /* discard NAT Keepalive packets */
-	dhd->pktfilter[3] = NULL;
-#else
-	/* Setup filter to allow only unicast */
-#if defined(CUSTOMER_HW_SAMSUNG)
-	dhd->pktfilter_count = 5;
-	dhd->pktfilter[0] = "100 0 0 0 "
-		HEX_PREF_STR UNI_FILTER_STR ZERO_ADDR_STR ETHER_TYPE_STR IPV6_FILTER_STR
-		" "
-		HEX_PREF_STR ZERO_ADDR_STR ZERO_ADDR_STR ETHER_TYPE_STR ZERO_TYPE_STR;
-		dhd->pktfilter[4] = "104 0 0 0 0xFFFFFF 0x01005E";
-		/* customer want to get IPV4 multicast packets */
-#else
-#error Customer want to filter out all IPV6 packets
+	dhd->pktfilter_count = 1;
+	/* Setup filter to allow unicast only */
 	dhd->pktfilter[0] = "100 0 0 0 0x01 0x00";
-#endif
-	dhd->pktfilter[1] = NULL;
-	dhd->pktfilter[2] = NULL;
-	dhd->pktfilter[3] = NULL;
-#endif /* GAN_LITE_NAT_KEEPALIVE_FILTER */
+
 #if defined(SOFTAP)
 	if (ap_fw_loaded) {
 		int i;
@@ -3809,6 +3827,11 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 		DHD_ERROR(("%s Setting WL UP failed %d\n", __FUNCTION__, ret));
 		goto done;
 	}
+
+#ifdef BCM4334_CHIP
+	bcm_mkiovar("bcn_li_bcn", (char *)&bcn_li_bcn, 4, iovbuf, sizeof(iovbuf));
+	dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
+#endif
 
 	/* query for 'ver' to get version info from firmware */
 	memset(buf, 0, sizeof(buf));
@@ -4008,6 +4031,9 @@ static int dhd_device_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 #endif /* ARP_OFFLOAD_SUPPORT */
+
+#define ARPHRD_IEEE80211_RADIOTAP 803
+
 int
 dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 {
@@ -4081,7 +4107,7 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 #endif /* defined(CONFIG_WIRELESS_EXT) */
 
 	dhd->pub.rxsz = DBUS_RX_BUFFER_SIZE_DHD(net);
-
+	net->type = ARPHRD_IEEE80211_RADIOTAP;
 	memcpy(net->dev_addr, temp_addr, ETHER_ADDR_LEN);
 
 	if ((err = register_netdev(net)) != 0) {

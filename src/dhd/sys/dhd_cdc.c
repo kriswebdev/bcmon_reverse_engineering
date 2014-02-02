@@ -128,7 +128,7 @@ dhdcdc_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len)
 	return ret;
 }
 
-static int
+int
 dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len, uint8 action)
 {
 	dhd_prot_t *prot = dhd->prot;
@@ -296,8 +296,9 @@ done:
 
 
 int
-dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
+dhd_prot_ioctl(void *dhd_copy, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 {
+	dhd_pub_t *dhd = (dhd_pub_t *)dhd_copy;
 	dhd_prot_t *prot = dhd->prot;
 	int ret = -1;
 	uint8 action;

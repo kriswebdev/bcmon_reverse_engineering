@@ -68,7 +68,7 @@ extern void dhd_prot_hdrpush(dhd_pub_t *, int ifidx, void *txp);
 extern int dhd_prot_hdrpull(dhd_pub_t *, int *ifidx, void *rxp, uchar *buf, uint *len);
 
 /* Use protocol to issue ioctl to dongle */
-extern int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len);
+extern int dhd_prot_ioctl(void *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len);
 
 /* Handles a protocol control response asynchronously */
 extern int dhd_prot_ctl_complete(dhd_pub_t *dhd);

@@ -7,8 +7,7 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DBCMDRIVER                     \
         -DMMC_SDIO_ABORT -DBCMSDIO -DBCMLXSDMMC -DBCMPLATFORM_BUS -DWLP2P     \
         -DNEW_COMPAT_WIRELESS -DWIFI_ACT_FRAME -DARP_OFFLOAD_SUPPORT          \
         -DKEEP_ALIVE -DCSCAN -DPKT_FILTER_SUPPORT                             \
-        -DEMBEDDED_PLATFORM
-#-DPNO_SUPPORT
+        -DEMBEDDED_PLATFORM -DPNO_SUPPORT
 
 # distinguish between the 43xx chip
 ifeq ($(CONFIG_BCM4334),m)
@@ -59,8 +58,8 @@ DHDCFLAGS += -DPASS_ALL_MCAST_PKTS
 #For INITIAL 2G scan features
 #select only one from USE_INIITAL_2G_SCAN and INITIAL_2G_SCAN_ORG
 
-#DHDCFLAGS += -DUSE_INITIAL_2G_SCAN
-DHDCFLAGS += -DUSE_INITIAL_2G_SCAN_ORG
+DHDCFLAGS += -DUSE_INITIAL_2G_SCAN
+#DHDCFLAGS += -DUSE_INITIAL_2G_SCAN_ORG
 
 DHDCFLAGS +=-DINITIAL_2G_SCAN_BY_ESCAN
 
@@ -156,7 +155,8 @@ dhd-y := src/bcmsdio/sys/bcmsdh.o	src/bcmsdio/sys/bcmsdh_linux.o \
 	 src/shared/sbutils.o		src/shared/siutils.o \
 	 src/wl/sys/wl_android.o	src/wl/sys/wl_cfg80211.o \
 	 src/wl/sys/wl_cfgp2p.o		src/wl/sys/wldev_common.o \
-	 src/wl/sys/wl_linux_mon.o	src/wl/sys/wl_roam.o
+	 src/wl/sys/wl_linux_mon.o	src/wl/sys/wl_roam.o \
+	 src/dhd/sys/bcmon.o
 
 all:
 	@echo "$(MAKE) --no-print-directory -C $(KDIR) SUBDIRS=$(CURDIR) modules"
