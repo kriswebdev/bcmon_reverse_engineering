@@ -5,13 +5,13 @@
  * SDIO core support 1bit, 4 bit SDIO mode as well as SPI mode.
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * 
- *         Unless you and Broadcom execute a separate written software license
+ *
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -19,12 +19,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: sbsdio.h 277737 2011-08-16 17:54:59Z $
+ * $Id: sbsdio.h 303863 2011-12-20 07:14:09Z $
  */
 
 #ifndef	_SBSDIO_H
@@ -36,7 +36,7 @@
 #define SBSDIO_SPROM_CS			0x10000		/* sprom command and status */
 #define SBSDIO_SPROM_INFO		0x10001		/* sprom info register */
 #define SBSDIO_SPROM_DATA_LOW		0x10002		/* sprom indirect access data byte 0 */
-#define SBSDIO_SPROM_DATA_HIGH		0x10003 	/* sprom indirect access data byte 1 */
+#define SBSDIO_SPROM_DATA_HIGH		0x10003		/* sprom indirect access data byte 1 */
 #define SBSDIO_SPROM_ADDR_LOW		0x10004		/* sprom indirect access addr byte 0 */
 #define SBSDIO_SPROM_ADDR_HIGH		0x10005		/* sprom indirect access addr byte 0 */
 #define SBSDIO_CHIP_CTRL_DATA		0x10006		/* xtal_pu (gpio) output */
@@ -50,14 +50,28 @@
 #define SBSDIO_FUNC1_SBADDRHIGH		0x1000C		/* SB Address Window High (b31:b24)    */
 #define SBSDIO_FUNC1_FRAMECTRL		0x1000D		/* Frame Control (frame term/abort) */
 #define SBSDIO_FUNC1_CHIPCLKCSR		0x1000E		/* ChipClockCSR (ALP/HT ctl/status) */
-#define SBSDIO_FUNC1_SDIOPULLUP 	0x1000F		/* SdioPullUp (on cmd, d0-d2) */
+#define SBSDIO_FUNC1_SDIOPULLUP		0x1000F		/* SdioPullUp (on cmd, d0-d2) */
 #define SBSDIO_FUNC1_WFRAMEBCLO		0x10019		/* Write Frame Byte Count Low */
 #define SBSDIO_FUNC1_WFRAMEBCHI		0x1001A		/* Write Frame Byte Count High */
 #define SBSDIO_FUNC1_RFRAMEBCLO		0x1001B		/* Read Frame Byte Count Low */
 #define SBSDIO_FUNC1_RFRAMEBCHI		0x1001C		/* Read Frame Byte Count High */
+#define SBSDIO_FUNC1_MESBUSYCTRL	0x1001D		/* MesBusyCtl at 0x1001D (rev 11) */
 
-#define SBSDIO_FUNC1_MISC_REG_START	0x10000 	/* f1 misc register start */
-#define SBSDIO_FUNC1_MISC_REG_LIMIT	0x1001C 	/* f1 misc register end */
+#define SBSDIO_FUNC1_MISC_REG_START	0x10000		/* f1 misc register start */
+#define SBSDIO_FUNC1_MISC_REG_LIMIT	0x1001C		/* f1 misc register end */
+
+/* Sdio Core Rev 12 */
+#define SBSDIO_FUNC1_WAKEUPCTRL			0x1001E
+#define SBSDIO_FUNC1_WCTRL_ALPWAIT_MASK		0x1
+#define SBSDIO_FUNC1_WCTRL_ALPWAIT_SHIFT	0
+#define SBSDIO_FUNC1_WCTRL_HTWAIT_MASK		0x2
+#define SBSDIO_FUNC1_WCTRL_HTWAIT_SHIFT		1
+#define SBSDIO_FUNC1_SLEEPCSR			0x1001F
+#define SBSDIO_FUNC1_SLEEPCSR_KSO_MASK		0x1
+#define SBSDIO_FUNC1_SLEEPCSR_KSO_SHIFT		0
+#define SBSDIO_FUNC1_SLEEPCSR_KSO_EN		1
+#define SBSDIO_FUNC1_SLEEPCSR_DEVON_MASK	0x2
+#define SBSDIO_FUNC1_SLEEPCSR_DEVON_SHIFT	1
 
 /* SBSDIO_SPROM_CS */
 #define SBSDIO_SPROM_IDLE		0
@@ -81,6 +95,12 @@
 #define SBSDIO_WATERMARK_MASK		0x7f		/* number of words - 1 for sd device
 							 * to wait before sending data to host
 							 */
+
+/* SBSDIO_MESBUSYCTRL */
+/* When RX FIFO has less entries than this & MBE is set
+ * => busy signal is asserted between data blocks.
+*/
+#define SBSDIO_MESBUSYCTRL_MASK		0x7f
 
 /* SBSDIO_DEVICE_CTL */
 #define SBSDIO_DEVCTL_SETBUSY		0x01		/* 1: device will assert busy signal when
@@ -114,6 +134,7 @@
 /* In rev8, actual avail bits followed original docs */
 #define SBSDIO_Rev8_HT_AVAIL		0x40
 #define SBSDIO_Rev8_ALP_AVAIL		0x80
+#define SBSDIO_CSR_MASK			0x1F
 
 #define SBSDIO_AVBITS			(SBSDIO_HT_AVAIL | SBSDIO_ALP_AVAIL)
 #define SBSDIO_ALPAV(regval)		((regval) & SBSDIO_AVBITS)

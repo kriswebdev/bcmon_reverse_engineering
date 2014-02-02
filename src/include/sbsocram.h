@@ -2,13 +2,13 @@
  * BCM47XX Sonics SiliconBackplane embedded ram core
  *
  * Copyright (C) 1999-2011, Broadcom Corporation
- * 
- *         Unless you and Broadcom execute a separate written software license
+ *
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -16,14 +16,13 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: sbsocram.h 277737 2011-08-16 17:54:59Z $
+ * $Id: sbsocram.h 271781 2011-07-13 20:00:06Z $
  */
-
 
 #ifndef	_SBSOCRAM_H
 #define	_SBSOCRAM_H
@@ -35,7 +34,7 @@
 #define	_PADLINE(line)	pad ## line
 #define	_XSTR(line)	_PADLINE(line)
 #define	PAD		_XSTR(__LINE__)
-#endif	
+#endif
 
 
 typedef volatile struct sbsocramregs {
@@ -46,9 +45,9 @@ typedef volatile struct sbsocramregs {
 	uint32	bankidx;
 	uint32	standbyctrl;
 
-	uint32	errlogstatus;	
-	uint32	errlogaddr;	
-	
+	uint32	errlogstatus;
+	uint32	errlogaddr;
+
 	uint32	cambankidx;
 	uint32	cambankstandbyctrl;
 	uint32	cambankpatchctrl;
@@ -57,7 +56,7 @@ typedef volatile struct sbsocramregs {
 	uint32	cambankdatareg;
 	uint32	cambankmaskreg;
 	uint32	PAD[1];
-	uint32	bankinfo;	
+	uint32	bankinfo;
 	uint32	PAD[15];
 	uint32	extmemconfig;
 	uint32	extmemparitycsr;
@@ -66,15 +65,15 @@ typedef volatile struct sbsocramregs {
 	uint32	extmemwrctrlandsize;
 	uint32	PAD[84];
 	uint32	workaround;
-	uint32	pwrctl;		
-	uint32  PAD[133];
-	uint32  sr_control;     
-	uint32  sr_status;      
-	uint32  sr_address;     
-	uint32  sr_data;        
+	uint32	pwrctl;
+	uint32	PAD[133];
+	uint32  sr_control;
+	uint32  sr_status;
+	uint32  sr_address;
+	uint32  sr_data;
 } sbsocramregs_t;
 
-#endif	
+#endif
 
 
 #define	SR_COREINFO		0x00
@@ -85,7 +84,7 @@ typedef volatile struct sbsocramregs {
 #define SR_PWRCTL		0x1e8
 
 
-#define	SRCI_PT_MASK		0x00070000	
+#define	SRCI_PT_MASK		0x00070000
 #define	SRCI_PT_SHIFT		16
 
 #define SRCI_PT_OCP_OCP		0
@@ -121,11 +120,11 @@ typedef volatile struct sbsocramregs {
 #define	SRSC_SBYOVR_SHIFT	31
 #define	SRSC_SBYOVRVAL_MASK	0x60000000
 #define	SRSC_SBYOVRVAL_SHIFT	29
-#define	SRSC_SBYEN_MASK		0x01000000	
+#define	SRSC_SBYEN_MASK		0x01000000
 #define	SRSC_SBYEN_SHIFT	24
 
 
-#define SRPC_PMU_STBYDIS_MASK	0x00000010	
+#define SRPC_PMU_STBYDIS_MASK	0x00000010
 #define SRPC_PMU_STBYDIS_SHIFT	4
 #define SRPC_STBYOVRVAL_MASK	0x00000008
 #define SRPC_STBYOVRVAL_SHIFT	3
@@ -154,7 +153,7 @@ typedef volatile struct sbsocramregs {
 #define SRCMD_DONE_DLY	1000
 
 
-#define SOCRAM_BANKINFO_SZMASK		0x3f
+#define SOCRAM_BANKINFO_SZMASK		0x7f
 #define SOCRAM_BANKIDX_ROM_MASK		0x100
 
 #define SOCRAM_BANKIDX_MEMTYPE_SHIFT	8
@@ -169,18 +168,26 @@ typedef volatile struct sbsocramregs {
 #define	SOCRAM_BANKINFO_STDBY_TIMER	0x800
 
 
-#define SOCRAM_BANKINFO_DEVRAMSEL_SHIFT	13
-#define SOCRAM_BANKINFO_DEVRAMSEL_MASK	0x2000
-#define SOCRAM_BANKINFO_DEVRAMPRO_SHIFT	14
-#define SOCRAM_BANKINFO_DEVRAMPRO_MASK	0x4000
+#define SOCRAM_BANKINFO_DEVRAMSEL_SHIFT		13
+#define SOCRAM_BANKINFO_DEVRAMSEL_MASK		0x2000
+#define SOCRAM_BANKINFO_DEVRAMPRO_SHIFT		14
+#define SOCRAM_BANKINFO_DEVRAMPRO_MASK		0x4000
+#define SOCRAM_BANKINFO_SLPSUPP_SHIFT		15
+#define SOCRAM_BANKINFO_SLPSUPP_MASK		0x8000
+#define SOCRAM_BANKINFO_RETNTRAM_SHIFT		16
+#define SOCRAM_BANKINFO_RETNTRAM_MASK		0x00010000
+#define SOCRAM_BANKINFO_PDASZ_SHIFT		17
+#define SOCRAM_BANKINFO_PDASZ_MASK		0x003E0000
+#define SOCRAM_BANKINFO_DEVRAMREMAP_SHIFT	24
+#define SOCRAM_BANKINFO_DEVRAMREMAP_MASK	0x01000000
 
 
 #define SOCRAM_DEVRAMBANK_MASK		0xF000
 #define SOCRAM_DEVRAMBANK_SHIFT		12
 
 
-#define	SOCRAM_BANKINFO_SZBASE		8192
-#define SOCRAM_BANKSIZE_SHIFT		13	
+#define   SOCRAM_BANKINFO_SZBASE          8192
+#define SOCRAM_BANKSIZE_SHIFT         13
 
 
-#endif	
+#endif

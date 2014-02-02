@@ -1,12 +1,12 @@
 /*
  * Copyright (C) 1999-2011, Broadcom Corporation
- * 
- *         Unless you and Broadcom execute a separate written software license
+ *
+ *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -14,13 +14,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
- * $Id: typedefs.h 290055 2011-10-15 21:26:26Z $
+ * $Id: typedefs.h 286783 2011-09-29 06:18:57Z $
  */
-
 
 #ifndef _TYPEDEFS_H_
 #define _TYPEDEFS_H_
@@ -45,10 +44,10 @@
 #define TRUE	true
 #endif
 
-#else	
+#else
 
 
-#endif	
+#endif
 
 #if defined(__x86_64__)
 #define TYPEDEF_UINTPTR
@@ -66,7 +65,6 @@ typedef long unsigned int size_t;
 
 
 
-
 #if defined(__sparc__)
 #define TYPEDEF_ULONG
 #endif
@@ -78,21 +76,21 @@ typedef long unsigned int size_t;
 #ifndef TARGETENV_android
 #define TYPEDEF_USHORT
 #define TYPEDEF_ULONG
-#endif 
+#endif
 #ifdef __KERNEL__
 #include <linux/version.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19))
 #define TYPEDEF_BOOL
-#endif	
+#endif
 
 #if (LINUX_VERSION_CODE == KERNEL_VERSION(2, 6, 18))
 #include <linux/compiler.h>
 #ifdef noinline_for_stack
 #define TYPEDEF_BOOL
 #endif
-#endif	
-#endif	
-#endif  
+#endif
+#endif
+#endif
 
 
 
@@ -112,7 +110,7 @@ typedef long unsigned int size_t;
 #define TYPEDEF_UINT64
 #endif
 
-#endif 
+#endif
 
 #if !defined(__DJGPP__)
 
@@ -121,24 +119,24 @@ typedef long unsigned int size_t;
 
 
 #if !defined(LINUX_HYBRID) || defined(LINUX_PORT)
-#include <linux/types.h>	
-#endif 
+#include <linux/types.h>
+#endif
 
 #else
 
 
 #include <sys/types.h>
 
-#endif 
+#endif
 
-#endif 
+#endif
 
 
 
 
 #define USE_TYPEDEF_DEFAULTS
 
-#endif 
+#endif
 
 
 
@@ -222,11 +220,11 @@ typedef double		float64;
 
 #if defined(FLOAT32)
 typedef float32 float_t;
-#else 
+#else
 typedef float64 float_t;
 #endif
 
-#endif 
+#endif
 
 
 
@@ -235,7 +233,7 @@ typedef float64 float_t;
 #endif
 
 #ifndef TRUE
-#define TRUE	1  
+#define TRUE	1
 #endif
 
 #ifndef NULL
@@ -247,10 +245,10 @@ typedef float64 float_t;
 #endif
 
 #ifndef ON
-#define	ON	1  
+#define	ON	1
 #endif
 
-#define	AUTO	(-1) 
+#define	AUTO	(-1)
 
 
 
@@ -260,13 +258,13 @@ typedef float64 float_t;
 
 
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) || defined(__lint)
 	#define BWL_COMPILER_GNU
 #elif defined(__CC_ARM) && __CC_ARM
 	#define BWL_COMPILER_ARMCC
 #else
 	#error "Unknown compiler!"
-#endif 
+#endif
 
 
 #ifndef INLINE
@@ -278,8 +276,8 @@ typedef float64 float_t;
 		#define INLINE	__inline
 	#else
 		#define INLINE
-	#endif 
-#endif 
+	#endif
+#endif
 
 #undef TYPEDEF_BOOL
 #undef TYPEDEF_UCHAR
@@ -299,7 +297,7 @@ typedef float64 float_t;
 #undef TYPEDEF_FLOAT64
 #undef TYPEDEF_FLOAT_T
 
-#endif 
+#endif
 
 
 #define UNUSED_PARAMETER(x) (void)(x)
@@ -309,4 +307,4 @@ typedef float64 float_t;
 
 
 #include <bcmdefs.h>
-#endif 
+#endif
