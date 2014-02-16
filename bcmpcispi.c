@@ -498,7 +498,7 @@ spi_check_client_intr(sdioh_info_t *sd, int *is_dev_intr)
 	return ours;
 }
 
-static void
+void
 hexdump(char *pfx, unsigned char *msg, int msglen)
 {
 	int i, col;

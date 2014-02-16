@@ -443,7 +443,6 @@ static void dhdsdio_release_dongle(dhd_bus_t *bus, osl_t *osh, int reset_flag);
 
 static uint process_nvram_vars(char *varbuf, uint len);
 
-
 static void dhd_dongle_setmemsize(struct dhd_bus *bus, int mem_size);
 static int dhd_bcmsdh_recv_buf(dhd_bus_t *bus, uint32 addr, uint fn, uint flags,
 	uint8 *buf, uint nbytes,
@@ -461,6 +460,9 @@ static int dhdsdio_download_nvram(struct dhd_bus *bus);
 static int dhdsdio_download_code_array(struct dhd_bus *bus);
 #endif
 
+
+int dump_my_mem(struct dhd_bus *bus, uint32 address, uint32 count);
+int dump_my_packet(struct dhd_bus *bus, uint32 address);
 
 static void
 dhd_dongle_setmemsize(struct dhd_bus *bus, int mem_size)
@@ -1640,7 +1642,7 @@ dhdsdio_pktgen_set(dhd_bus_t *bus, uint8 *arg)
 }
 #endif /* SDTEST */
 
-static int
+int
 dhdsdio_membytes(dhd_bus_t *bus, bool write, uint32 address, uint8 *data, uint size)
 {
 	int bcmerror = 0;
@@ -1832,18 +1834,19 @@ dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size)
 			                                 (uint8*)&tr, sizeof(trap_t))) < 0)
 				goto done;
 
-			bcm_bprintf(&strbuf,
-			"Dongle trap type 0x%x @ epc 0x%x, cpsr 0x%x, spsr 0x%x, sp 0x%x,"
+			printf("Dongle trap type 0x%x @ epc 0x%x, cpsr 0x%x, spsr 0x%x, sp 0x%x,"
 			"lp 0x%x, rpc 0x%x Trap offset 0x%x, "
-			"r0 0x%x, r1 0x%x, r2 0x%x, r3 0x%x, r4 0x%x, r5 0x%x, r6 0x%x, r7 0x%x\n",
+			"r0 0x%x, r1 0x%x, r2 0x%x, r3 0x%x, r4 0x%x, r5 0x%x, r6 0x%x, r7 0x%x\nr8 0x%x, r9 0x%x, r10 0x%x\n",
 			tr.type, tr.epc, tr.cpsr, tr.spsr, tr.r13, tr.r14, tr.pc,
 			sdpcm_shared.trap_addr,
-			tr.r0, tr.r1, tr.r2, tr.r3, tr.r4, tr.r5, tr.r6, tr.r7);
+			tr.r0, tr.r1, tr.r2, tr.r3, tr.r4, tr.r5, tr.r6, tr.r7, tr.r8, tr.r9, tr.r10);
 		}
 	}
 
+	//dump_my_mem(bus, 0x3ea00, 1);
+	//printf("dump_my_mem: placeholder\n");
 	if (sdpcm_shared.flags & (SDPCM_SHARED_ASSERT | SDPCM_SHARED_TRAP)) {
-		DHD_ERROR(("%s: %s\n", __FUNCTION__, strbuf.origbuf));
+		printf("%s: %s\n", __FUNCTION__, strbuf.origbuf);
 	}
 
 done:
@@ -2358,7 +2361,7 @@ exit:
 
 	dhd_os_sdunlock(bus->dhd);
 
-	
+    
 	if (actionid == IOV_SVAL(IOV_DEVRESET) && bool_val == FALSE)
     {
 		dhd_preinit_ioctls((dhd_pub_t *) bus->dhd);
@@ -3364,7 +3367,7 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq)
 		dhd_os_sdunlock_rxq(bus->dhd);
 		if (num) {
 			dhd_os_sdunlock(bus->dhd);
-			dhd_rx_frame(bus->dhd, ifidx, save_pfirst, num);
+			dhd_rx_frame(bus->dhd, ifidx, save_pfirst, num,0);
 			dhd_os_sdlock(bus->dhd);
 		}
 
@@ -3403,7 +3406,7 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 #endif
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
-
+	//dump_my_packet(bus, 0x00027E3C);
 	ASSERT(maxframes);
 
 #ifdef SDTEST
@@ -3880,7 +3883,7 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 
 #ifdef DHD_DEBUG
 		if (DHD_BYTES_ON() && DHD_DATA_ON()) {
-			prhex("Rx Data", PKTDATA(osh, pkt), len);
+			prhex("Rx Data 1", PKTDATA(osh, pkt), len);
 		}
 #endif
 
@@ -3906,6 +3909,15 @@ deliver:
 			continue;
 		}
 
+		if(chan==0xf)
+		{
+			//PKTSETLEN(osh, pkt, len+14);
+			//PKTPULL(osh, pkt, doff);
+			dhd_os_sdunlock(bus->dhd);
+			dhd_rx_frame(bus->dhd, ifidx, pkt, 1, chan);
+			dhd_os_sdlock(bus->dhd);
+			continue;
+		}
 		/* Fill in packet len and prio, deliver upward */
 		PKTSETLEN(osh, pkt, len);
 		PKTPULL(osh, pkt, doff);
@@ -3923,7 +3935,7 @@ deliver:
 			PKTFREE(bus->dhd->osh, pkt, FALSE);
 			dhd_os_sdunlock_rxq(bus->dhd);
 			continue;
-		} else if (dhd_prot_hdrpull(bus->dhd, &ifidx, pkt) != 0) {
+		} else if (chan != 0xf && dhd_prot_hdrpull(bus->dhd, &ifidx, pkt) != 0) {
 			DHD_ERROR(("%s: rx protocol error\n", __FUNCTION__));
 			dhd_os_sdlock_rxq(bus->dhd);
 			PKTFREE(bus->dhd->osh, pkt, FALSE);
@@ -3935,7 +3947,7 @@ deliver:
 
 		/* Unlock during rx call */
 		dhd_os_sdunlock(bus->dhd);
-		dhd_rx_frame(bus->dhd, ifidx, pkt, 1);
+		dhd_rx_frame(bus->dhd, ifidx, pkt, 1, chan);
 		dhd_os_sdlock(bus->dhd);
 	}
 	rxcount = maxframes - rxleft;
@@ -5427,11 +5439,38 @@ dhdsdio_download_code_array(struct dhd_bus *bus)
 		MFREE(bus->dhd->osh, ularray, bus->ramsize);
 	}
 #endif /* DHD_DEBUG */
-    
+
 err:
 	return bcmerror;
 }
 #endif /* BCMEMBEDIMAGE */
+
+void
+hexdump(char *pfx, unsigned char *msg, int msglen, int address)
+{
+	int i, col;
+	char buf[80];
+
+	ASSERT(strlen(pfx) + 49 <= sizeof(buf));
+
+	col = 0;
+
+	for (i = 0; i < msglen; i++, col++) {
+		if (col % 16 == 0)
+		{
+			sprintf(buf, "%08x: ", address + i);
+			//strcpy(buf, pfx);
+		}
+		sprintf(buf + strlen(buf), "%02x", msg[i]);
+		if ((col + 1) % 16 == 0)
+			printf("%s\n", buf);
+		else
+			sprintf(buf + strlen(buf), " ");
+	}
+
+	if (col % 16 != 0)
+		printf("%s\n", buf);
+}
 
 static int
 dhdsdio_download_code_file(struct dhd_bus *bus, char *fw_path)
@@ -5702,6 +5741,7 @@ dhd_bcmsdh_recv_buf(dhd_bus_t *bus, uint32 addr, uint fn, uint flags, uint8 *buf
 {
 	int status;
 
+	//printf("dhd_bcmsdh_recv_buf: addr = %08X\n", addr);
 	/* 4329: GSPI check */
 	status = bcmsdh_recv_buf(bus->sdh, addr, fn, flags, buf, nbytes, pkt, complete, handle);
 	return status;

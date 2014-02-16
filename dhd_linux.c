@@ -61,6 +61,9 @@
 #include <dhd_proto.h>
 #include <dhd_dbg.h>
 #include <wl_iw.h>
+
+#include "bcmon.h"
+
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
 #endif
@@ -163,6 +166,7 @@ static int wifi_remove(struct platform_device *pdev)
 
 	DHD_TRACE(("## %s\n", __FUNCTION__));
 	wifi_control_data = wifi_ctrl;
+
 	wifi_set_power(0, 0);	/* Power Off */
 	wifi_set_carddetect(0);	/* CardDetect (1->0) */
 
@@ -784,6 +788,7 @@ _dhd_set_multicast_list(dhd_info_t *dhd, int ifidx)
 	char *buf, *bufp;
 	uint buflen;
 	int ret;
+	printf("_dhd_set_multicast_list: enter!\n");
 	ASSERT(dhd && dhd->iflist[ifidx]);
 	dev = dhd->iflist[ifidx]->net;
 
@@ -1244,12 +1249,12 @@ dhd_txflowcontrol(dhd_pub_t *dhdp, int ifidx, bool state)
 }
 
 void
-dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
+dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, int chan)
 {
 	dhd_info_t *dhd = (dhd_info_t *)dhdp->info;
 	struct sk_buff *skb;
-	uchar *eth;
-	uint len;
+	//uchar *eth;
+	//uint len;
 	void * data, *pnext, *save_pktbuf;
 	int i;
 	dhd_if_t *ifp;
@@ -1276,8 +1281,6 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 		 * we set the 'net->hard_header_len' to ETH_HLEN + extra space required
 		 * for BDC, Hardware header etc. and not just the ETH_HLEN
 		 */
-		eth = skb->data;
-		len = skb->len;
 
 
 		ifp = dhd->iflist[ifidx];
@@ -1286,16 +1289,35 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 
 		ASSERT(ifp);
 		skb->dev = ifp->net;
-		skb->protocol = eth_type_trans(skb, skb->dev);
+
+		if (chan==15) {
+			skb = bcmon_decode_skb(skb);
+			if(skb==0)
+			{
+				PKTFREE(dhdp->osh, skb, FALSE);
+				return;
+			}
+			/*
+			skb_set_mac_header(skb, 0);
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+			skb->pkt_type = PACKET_OTHERHOST;
+			skb->protocol = htons(ETH_P_802_2);
+			*/
+	  }else{
+			PKTFREE(dhdp->osh, skb, FALSE);
+			return;
+	  }
+			skb->protocol = eth_type_trans(skb, skb->dev);
+		//}
 
 		if (skb->pkt_type == PACKET_MULTICAST) {
 			dhd->pub.rx_multicast++;
 		}
 
-		skb->data = eth;
-		skb->len = len;
+		if (chan!=15) {
 		/* Strip header, count, deliver upward */
 			skb_pull(skb, ETH_HLEN);
+		}
 
 		/* Process special event packets and then discard them */
 		if (ntoh16(skb->protocol) == ETHER_TYPE_BRCM)
@@ -2404,6 +2426,7 @@ static int dhd_device_event(struct notifier_block *this, unsigned long event,
 	return NOTIFY_DONE;
 }
 
+#define ARPHRD_IEEE80211_RADIOTAP 803
 
 int
 dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
@@ -2466,8 +2489,9 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 #endif /* defined(CONFIG_WIRELESS_EXT) */
 
 	dhd->pub.rxsz = net->mtu + net->hard_header_len + dhd->pub.hdrlen;
-	memcpy(net->dev_addr, temp_addr, ETHER_ADDR_LEN);
 
+	memcpy(net->dev_addr, temp_addr, ETHER_ADDR_LEN);
+	net->type = ARPHRD_IEEE80211_RADIOTAP;
 	if (register_netdev(net) != 0) {
 		DHD_ERROR(("%s: couldn't register the net device\n", __FUNCTION__));
 		goto fail;

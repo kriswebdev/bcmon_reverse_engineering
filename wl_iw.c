@@ -335,8 +335,8 @@ dev_wlc_ioctl(
 
 	net_os_wake_lock(dev);
 
-	WL_INFORM(("\n%s, PID:%x: send Local IOCTL -> dhd: cmd:0x%x, buf:%p, len:%d ,\n",
-		__FUNCTION__, current->pid, cmd, arg, len));
+	printf("\n%s, PID:%x: send Local IOCTL -> dhd: cmd:0x%x, buf:%p, len:%d ,\n",
+		__FUNCTION__, current->pid, cmd, arg, len);
 
 	if (g_onoff == G_WLAN_SET_ON) {
 		memset(&ioc, 0, sizeof(ioc));
@@ -2311,6 +2311,7 @@ wl_iw_set_mode(
 		infra = ap = 1;
 		break;
 	case IW_MODE_ADHOC:
+	case IW_MODE_MONITOR:
 	case IW_MODE_AUTO:
 		break;
 	case IW_MODE_INFRA:
@@ -2348,7 +2349,7 @@ wl_iw_get_mode(
 
 	infra = dtoh32(infra);
 	ap = dtoh32(ap);
-	*uwrq = infra ? ap ? IW_MODE_MASTER : IW_MODE_INFRA : IW_MODE_ADHOC;
+	*uwrq = IW_MODE_MONITOR;
 
 	return 0;
 }
