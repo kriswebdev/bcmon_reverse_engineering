@@ -443,6 +443,7 @@ static void dhdsdio_release_dongle(dhd_bus_t *bus, osl_t *osh, int reset_flag);
 
 static uint process_nvram_vars(char *varbuf, uint len);
 
+
 static void dhd_dongle_setmemsize(struct dhd_bus *bus, int mem_size);
 static int dhd_bcmsdh_recv_buf(dhd_bus_t *bus, uint32 addr, uint fn, uint flags,
 	uint8 *buf, uint nbytes,
@@ -2357,7 +2358,7 @@ exit:
 
 	dhd_os_sdunlock(bus->dhd);
 
-
+	
 	if (actionid == IOV_SVAL(IOV_DEVRESET) && bool_val == FALSE)
     {
 		dhd_preinit_ioctls((dhd_pub_t *) bus->dhd);
@@ -5364,9 +5365,7 @@ dhdsdio_download_code_array(struct dhd_bus *bus)
 
 	DHD_INFO(("%s: download embedded firmware...\n", __FUNCTION__));
 
-    /* Download image */
-
-
+	/* Download image */
 	while ((offset + MEMBLOCK) < sizeof(dlarray)) {
 		bcmerror = dhdsdio_membytes(bus, TRUE, offset, dlarray + offset, MEMBLOCK);
 		if (bcmerror) {
@@ -5457,7 +5456,9 @@ dhdsdio_download_code_file(struct dhd_bus *bus, char *fw_path)
 	if ((uint32)(uintptr)memblock % DHD_SDALIGN)
 		memptr += (DHD_SDALIGN - ((uint32)(uintptr)memblock % DHD_SDALIGN));
 
-	/* Download image */
+
+        
+    /* Download image */
 	while ((len = dhd_os_get_image_block((char*)memptr, MEMBLOCK, image))) {
 		bcmerror = dhdsdio_membytes(bus, TRUE, offset, memptr, len);
 		if (bcmerror) {
@@ -5468,7 +5469,7 @@ dhdsdio_download_code_file(struct dhd_bus *bus, char *fw_path)
 
 		offset += MEMBLOCK;
 	}
-
+    
 err:
 	if (memblock)
 		MFREE(bus->dhd->osh, memblock, MEMBLOCK + DHD_SDALIGN);

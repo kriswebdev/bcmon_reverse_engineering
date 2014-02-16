@@ -69,6 +69,9 @@
 
 struct semaphore wifi_control_sem;
 
+struct dhd_bus *g_bus;
+
+static struct wifi_platform_data *wifi_control_data = NULL;
 static struct resource *wifi_irqres = NULL;
 
 int wifi_get_irq_number(unsigned long *irq_flags_ptr)
@@ -781,7 +784,6 @@ _dhd_set_multicast_list(dhd_info_t *dhd, int ifidx)
 	char *buf, *bufp;
 	uint buflen;
 	int ret;
-
 	ASSERT(dhd && dhd->iflist[ifidx]);
 	dev = dhd->iflist[ifidx]->net;
 
@@ -1277,6 +1279,7 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 		eth = skb->data;
 		len = skb->len;
 
+
 		ifp = dhd->iflist[ifidx];
 		if (ifp == NULL)
 			ifp = dhd->iflist[0];
@@ -1291,9 +1294,8 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt)
 
 		skb->data = eth;
 		skb->len = len;
-
 		/* Strip header, count, deliver upward */
-		skb_pull(skb, ETH_HLEN);
+			skb_pull(skb, ETH_HLEN);
 
 		/* Process special event packets and then discard them */
 		if (ntoh16(skb->protocol) == ETHER_TYPE_BRCM)
@@ -2402,6 +2404,7 @@ static int dhd_device_event(struct notifier_block *this, unsigned long event,
 	return NOTIFY_DONE;
 }
 
+
 int
 dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 {
@@ -2463,7 +2466,6 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 #endif /* defined(CONFIG_WIRELESS_EXT) */
 
 	dhd->pub.rxsz = net->mtu + net->hard_header_len + dhd->pub.hdrlen;
-
 	memcpy(net->dev_addr, temp_addr, ETHER_ADDR_LEN);
 
 	if (register_netdev(net) != 0) {
