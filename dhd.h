@@ -166,7 +166,7 @@ typedef struct dhd_pub {
 	char * pktfilter[100];
 	int pktfilter_count;
 
-	uint8 country_code[WLC_CNTRY_BUF_SZ];
+	wl_country_t dhd_cspec;		/* Current Locale info */
 	char eventmask[WL_EVENTING_MASK_LEN];
 
 } dhd_pub_t;
@@ -273,7 +273,7 @@ extern void dhd_txflowcontrol(dhd_pub_t *dhdp, int ifidx, bool on);
 extern bool dhd_prec_enq(dhd_pub_t *dhdp, struct pktq *q, void *pkt, int prec);
 
 /* Receive frame for delivery to OS.  Callee disposes of rxp. */
-extern void dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *rxp, int numpkt, int chan);
+extern void dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *rxp, int numpkt);
 
 /* Return pointer to interface name */
 extern char *dhd_ifname(dhd_pub_t *dhdp, int idx);
@@ -285,7 +285,7 @@ extern void dhd_sched_dpc(dhd_pub_t *dhdp);
 extern void dhd_txcomplete(dhd_pub_t *dhdp, void *txp, bool success);
 
 /* Query ioctl */
-extern int  dhdcdc_query_ioctl(void *dhd, int ifidx, uint cmd, void *buf, uint len);
+extern int  dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len);
 
 /* OS independent layer functions */
 extern int dhd_os_proto_block(dhd_pub_t * pub);

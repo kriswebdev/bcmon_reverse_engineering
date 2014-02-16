@@ -135,8 +135,6 @@ const bcm_iovar_t dhd_iovars[] = {
 	{NULL, 0, 0, 0, 0 }
 };
 
-dhd_pub_t *global_dhd;
-
 void
 dhd_common_init(void)
 {
@@ -146,8 +144,7 @@ dhd_common_init(void)
 	 * behaviour since the value of the globals may be different on the
 	 * first time that the driver is initialized vs subsequent initializations.
 	 */
-
-	dhd_msg_level = 1; //0xffffffff;//DHD_ERROR_VAL;
+	dhd_msg_level = DHD_ERROR_VAL;
 #ifdef CONFIG_BCM4329_FW_PATH
 	strncpy(fw_path, CONFIG_BCM4329_FW_PATH, MOD_PARAM_PATHLEN-1);
 #else
@@ -158,7 +155,6 @@ dhd_common_init(void)
 #else
 	nv_path[0] = '\0';
 #endif
-    printk("bcmon: we are running!!!\n");
 }
 
 static int
@@ -1056,9 +1052,6 @@ fail:
 		MFREE(dhd->osh, arg_org, strlen(arg) + 1);
 }
 
-extern void
-hexdump(char *pfx, unsigned char *msg, int msglen);
-
 void
 dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 {
@@ -1180,7 +1173,6 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	       &pkt_filter,
 	       WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_FIXED_LEN);
 
-	hexdump("filter_buf:", buf,buf_len);
 	rc = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, buf, buf_len);
 	rc = rc >= 0 ? 0 : rc;
 
@@ -1332,7 +1324,6 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	struct ether_addr ea_addr;
 #endif /* GET_CUSTOM_MAC_ENABLE */
 
-    global_dhd = dhd;
 	dhd_os_proto_block(dhd);
 
 #ifdef GET_CUSTOM_MAC_ENABLE
