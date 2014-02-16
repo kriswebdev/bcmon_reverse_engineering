@@ -254,12 +254,6 @@ typedef struct wl_join_params {
 
 #define WLC_CNTRY_BUF_SZ	4		
 
-typedef struct wl_country {
-	char country_abbrev[WLC_CNTRY_BUF_SZ];
-	int32 rev;
-	char ccode[WLC_CNTRY_BUF_SZ];
-} wl_country_t;
-
 typedef enum sup_auth_status {
 	
 	WLC_SUP_DISCONNECTED = 0,
@@ -862,7 +856,7 @@ typedef struct wl_ioctl {
 #define PM_MAX	1
 #define PM_FAST 2
 
-#define LISTEN_INTERVAL			20
+#define LISTEN_INTERVAL			10
 
 #define	INTERFERE_NONE	0	
 #define	NON_WLAN	1	
