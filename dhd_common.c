@@ -135,6 +135,8 @@ const bcm_iovar_t dhd_iovars[] = {
 	{NULL, 0, 0, 0, 0 }
 };
 
+dhd_pub_t *global_dhd;
+
 void
 dhd_common_init(void)
 {
@@ -144,7 +146,8 @@ dhd_common_init(void)
 	 * behaviour since the value of the globals may be different on the
 	 * first time that the driver is initialized vs subsequent initializations.
 	 */
-	dhd_msg_level = DHD_ERROR_VAL;
+
+	dhd_msg_level = 1; //0xffffffff;//DHD_ERROR_VAL;
 #ifdef CONFIG_BCM4329_FW_PATH
 	strncpy(fw_path, CONFIG_BCM4329_FW_PATH, MOD_PARAM_PATHLEN-1);
 #else
@@ -155,6 +158,7 @@ dhd_common_init(void)
 #else
 	nv_path[0] = '\0';
 #endif
+    printk("bcmon: we are running!!!\n");
 }
 
 static int
@@ -1052,6 +1056,9 @@ fail:
 		MFREE(dhd->osh, arg_org, strlen(arg) + 1);
 }
 
+extern void
+hexdump(char *pfx, unsigned char *msg, int msglen);
+
 void
 dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 {
@@ -1159,6 +1166,8 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 		goto fail;
 	}
 
+
+
 	pkt_filter.u.pattern.size_bytes = mask_size;
 	buf_len += WL_PKT_FILTER_FIXED_LEN;
 	buf_len += (WL_PKT_FILTER_PATTERN_FIXED_LEN + 2 * mask_size);
@@ -1171,6 +1180,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	       &pkt_filter,
 	       WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_FIXED_LEN);
 
+	hexdump("filter_buf:", buf,buf_len);
 	rc = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, buf, buf_len);
 	rc = rc >= 0 ? 0 : rc;
 
@@ -1301,7 +1311,6 @@ int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen)
 	return 0;
 }
 
-
 int
 dhd_preinit_ioctls(dhd_pub_t *dhd)
 {
@@ -1323,6 +1332,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	struct ether_addr ea_addr;
 #endif /* GET_CUSTOM_MAC_ENABLE */
 
+    global_dhd = dhd;
 	dhd_os_proto_block(dhd);
 
 #ifdef GET_CUSTOM_MAC_ENABLE
@@ -1369,10 +1379,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #endif /* SET_RANDOM_MAC_SOFTAP */
 
 	/* Set Country code */
-	if (dhd->dhd_cspec.ccode[0] != 0) {
-		bcm_mkiovar("country", (char *)&dhd->dhd_cspec, \
-			sizeof(wl_country_t), iovbuf, sizeof(iovbuf));
-		if ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
+	if (dhd->country_code[0] != 0) {
+		if (dhdcdc_set_ioctl(dhd, 0, WLC_SET_COUNTRY,
+			dhd->country_code, sizeof(dhd->country_code)) < 0) {
 			DHD_ERROR(("%s: country code setting failed\n", __FUNCTION__));
 		}
 	}
@@ -1389,7 +1398,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhdcdc_query_ioctl(dhd, 0, WLC_GET_VAR, buf, sizeof(buf));
 	bcmstrtok(&ptr, "\n", 0);
 	/* Print fw version info */
-	DHD_ERROR(("Firmware version = %s\n", buf));
+    DHD_ERROR(("Firmware version = %s\n", buf));
 
 	/* Set PowerSave mode */
 	dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode, sizeof(power_mode));
