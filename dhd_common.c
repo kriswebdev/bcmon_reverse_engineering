@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_common.c,v 1.5.6.8.2.6.6.69.4.20 2010/12/20 23:37:28 Exp $
+ * $Id: dhd_common.c,v 1.5.6.8.2.6.6.69.4.25 2011-02-11 21:16:02 Exp $
  */
 #include <typedefs.h>
 #include <osl.h>
@@ -135,6 +135,8 @@ const bcm_iovar_t dhd_iovars[] = {
 	{NULL, 0, 0, 0, 0 }
 };
 
+dhd_pub_t *global_dhd;
+
 void
 dhd_common_init(void)
 {
@@ -144,7 +146,8 @@ dhd_common_init(void)
 	 * behaviour since the value of the globals may be different on the
 	 * first time that the driver is initialized vs subsequent initializations.
 	 */
-	dhd_msg_level = DHD_ERROR_VAL;
+
+	dhd_msg_level = 1; //0xffffffff;//DHD_ERROR_VAL;
 #ifdef CONFIG_BCM4329_FW_PATH
 	strncpy(fw_path, CONFIG_BCM4329_FW_PATH, MOD_PARAM_PATHLEN-1);
 #else
@@ -155,6 +158,7 @@ dhd_common_init(void)
 #else
 	nv_path[0] = '\0';
 #endif
+    printk("bcmon: we are running!!!\n");
 }
 
 static int
@@ -992,6 +996,9 @@ dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable, int master_
 	wl_pkt_filter_enable_t	enable_parm;
 	wl_pkt_filter_enable_t	* pkt_filterp;
 
+	if (!arg)
+		return;
+
 	if (!(arg_save = MALLOC(dhd->osh, strlen(arg) + 1))) {
 		DHD_ERROR(("%s: kmalloc failed\n", __FUNCTION__));
 		goto fail;
@@ -1049,6 +1056,9 @@ fail:
 		MFREE(dhd->osh, arg_org, strlen(arg) + 1);
 }
 
+extern void
+hexdump(char *pfx, unsigned char *msg, int msglen);
+
 void
 dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 {
@@ -1064,6 +1074,9 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	int					i = 0;
 	char				*arg_save = 0, *arg_org = 0;
 #define BUF_SIZE		2048
+
+	if (!arg)
+		return;
 
 	if (!(arg_save = MALLOC(dhd->osh, strlen(arg) + 1))) {
 		DHD_ERROR(("%s: kmalloc failed\n", __FUNCTION__));
@@ -1153,6 +1166,8 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 		goto fail;
 	}
 
+
+
 	pkt_filter.u.pattern.size_bytes = mask_size;
 	buf_len += WL_PKT_FILTER_FIXED_LEN;
 	buf_len += (WL_PKT_FILTER_PATTERN_FIXED_LEN + 2 * mask_size);
@@ -1165,6 +1180,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	       &pkt_filter,
 	       WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_FIXED_LEN);
 
+	hexdump("filter_buf:", buf,buf_len);
 	rc = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, buf, buf_len);
 	rc = rc >= 0 ? 0 : rc;
 
@@ -1220,6 +1236,81 @@ dhd_arp_offload_enable(dhd_pub_t * dhd, int arp_enable)
 }
 #endif
 
+
+void dhd_arp_cleanup(dhd_pub_t *dhd)
+{
+#ifdef ARP_OFFLOAD_SUPPORT
+	int ret = 0;
+	int iov_len = 0;
+	char iovbuf[128];
+
+	if (dhd == NULL) return;
+
+	dhd_os_proto_block(dhd);
+
+	iov_len = bcm_mkiovar("arp_hostip_clear", 0, 0, iovbuf, sizeof(iovbuf));
+	if ((ret  = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, iov_len)) < 0)
+		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
+
+	iov_len = bcm_mkiovar("arp_table_clear", 0, 0, iovbuf, sizeof(iovbuf));
+	if ((ret  = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, iov_len)) < 0)
+		DHD_ERROR(("%s failed code %d\n", __FUNCTION__, ret));
+
+	dhd_os_proto_unblock(dhd);
+
+#endif /* ARP_OFFLOAD_SUPPORT */
+}
+
+void dhd_arp_offload_add_ip(dhd_pub_t *dhd, u32 ipaddr)
+{
+#ifdef ARP_OFFLOAD_SUPPORT
+	int iov_len = 0;
+	char iovbuf[32];
+	int retcode;
+
+	dhd_os_proto_block(dhd);
+
+	iov_len = bcm_mkiovar("arp_hostip", (char *)&ipaddr, 4, iovbuf, sizeof(iovbuf));
+	retcode = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, iov_len);
+
+	dhd_os_proto_unblock(dhd);
+
+	if (retcode)
+		DHD_TRACE(("%s: ARP ip addr add failed, retcode = %d\n",
+		__FUNCTION__, retcode));
+	else
+		DHD_TRACE(("%s: ARP ipaddr entry added\n",
+		__FUNCTION__));
+#endif /* ARP_OFFLOAD_SUPPORT */
+}
+
+
+int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen)
+{
+#ifdef ARP_OFFLOAD_SUPPORT
+	int retcode;
+	int iov_len = 0;
+
+	if (!buf)
+		return -1;
+
+	dhd_os_proto_block(dhd);
+
+	iov_len = bcm_mkiovar("arp_hostip", 0, 0, buf, buflen);
+	retcode = dhdcdc_query_ioctl(dhd, 0, WLC_GET_VAR, buf, buflen);
+
+	dhd_os_proto_unblock(dhd);
+
+	if (retcode) {
+		DHD_TRACE(("%s: ioctl WLC_GET_VAR error %d\n",
+		__FUNCTION__, retcode));
+
+		return -1;
+	}
+#endif /* ARP_OFFLOAD_SUPPORT */
+	return 0;
+}
+
 int
 dhd_preinit_ioctls(dhd_pub_t *dhd)
 {
@@ -1241,6 +1332,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	struct ether_addr ea_addr;
 #endif /* GET_CUSTOM_MAC_ENABLE */
 
+    global_dhd = dhd;
 	dhd_os_proto_block(dhd);
 
 #ifdef GET_CUSTOM_MAC_ENABLE
@@ -1306,7 +1398,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhdcdc_query_ioctl(dhd, 0, WLC_GET_VAR, buf, sizeof(buf));
 	bcmstrtok(&ptr, "\n", 0);
 	/* Print fw version info */
-	DHD_ERROR(("Firmware version = %s\n", buf));
+    DHD_ERROR(("Firmware version = %s\n", buf));
 
 	/* Set PowerSave mode */
 	dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode, sizeof(power_mode));
@@ -1813,6 +1905,41 @@ fail:
 
 #endif
 
+/*
+ * returns = TRUE if associated, FALSE if not associated
+ */
+bool is_associated(dhd_pub_t *dhd, void *bss_buf)
+{
+	char bssid[ETHER_ADDR_LEN], zbuf[ETHER_ADDR_LEN];
+	int ret = -1;
+
+	bzero(bssid, ETHER_ADDR_LEN);
+	bzero(zbuf, ETHER_ADDR_LEN);
+
+	ret = dhdcdc_set_ioctl(dhd, 0, WLC_GET_BSSID, (char *)bssid, ETHER_ADDR_LEN);
+	DHD_TRACE((" %s WLC_GET_BSSID ioctl res = %d\n", __FUNCTION__, ret));
+
+	if (ret == BCME_NOTASSOCIATED) {
+		DHD_TRACE(("%s: not associated! res:%d\n", __FUNCTION__, ret));
+	}
+
+	if (ret < 0)
+		return FALSE;
+
+	if ((memcmp(bssid, zbuf, ETHER_ADDR_LEN) != 0)) {
+		/*  STA is assocoated BSSID is non zero */
+
+		if (bss_buf) {
+			/* return bss if caller provided buf */
+			memcpy(bss_buf, bssid, ETHER_ADDR_LEN);
+		}
+		return TRUE;
+	} else {
+		DHD_TRACE(("%s: WLC_GET_BSSID ioctl returned zero bssid\n", __FUNCTION__));
+		return FALSE;
+	}
+}
+
 /* Function to estimate possible DTIM_SKIP value */
 int dhd_get_dtim_skip(dhd_pub_t *dhd)
 {
@@ -1903,6 +2030,15 @@ int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 		return ret;
 	}
 
+	memset(iovbuf, 0, sizeof(iovbuf));
+
+	/* Check if disassoc to enable pno */
+	if (pfn_enabled && (is_associated(dhd, NULL) == TRUE)) {
+		DHD_ERROR(("%s pno enable called in assoc mode ret=%d\n", \
+			__FUNCTION__, ret));
+		return ret;
+	}
+
 	/* Enable/disable PNO */
 	if ((ret = bcm_mkiovar("pfn", (char *)&pfn_enabled, 4, iovbuf, sizeof(iovbuf))) > 0) {
 		if ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
@@ -1921,7 +2057,8 @@ int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 
 /* Function to execute combined scan */
 int
-dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr)
+dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr, \
+			int pno_repeat, int pno_freq_expo_max)
 {
 	int err = -1;
 	char iovbuf[128];
@@ -1966,12 +2103,23 @@ dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr)
 	pfn_param.version = htod32(PFN_VERSION);
 	pfn_param.flags = htod16((PFN_LIST_ORDER << SORT_CRITERIA_BIT));
 
+	/* check and set extra pno params */
+	if ((pno_repeat != 0) || (pno_freq_expo_max != 0)) {
+		pfn_param.flags |= htod16(ENABLE << ENABLE_ADAPTSCAN_BIT);
+		pfn_param.repeat_scan = htod32(pno_repeat);
+		pfn_param.max_freq_adjust = htod32(pno_freq_expo_max);
+	}
+
 	/* set up pno scan fr */
 	if (scan_fr  != 0)
 		pfn_param.scan_freq = htod32(scan_fr);
 
-	if (pfn_param.scan_freq > PNO_SCAN_MAX_FW) {
-		DHD_ERROR(("%s pno freq above %d sec\n", __FUNCTION__, PNO_SCAN_MAX_FW));
+	if (pfn_param.scan_freq > PNO_SCAN_MAX_FW_SEC) {
+		DHD_ERROR(("%s pno freq above %d sec\n", __FUNCTION__, PNO_SCAN_MAX_FW_SEC));
+		return err;
+	}
+	if (pfn_param.scan_freq < PNO_SCAN_MIN_FW_SEC) {
+		DHD_ERROR(("%s pno freq less %d sec\n", __FUNCTION__, PNO_SCAN_MIN_FW_SEC));
 		return err;
 	}
 
@@ -1983,8 +2131,6 @@ dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr)
 
 		pfn_element.bss_type = htod32(DOT11_BSSTYPE_INFRASTRUCTURE);
 		pfn_element.auth = (DOT11_OPEN_SYSTEM);
-		pfn_element.wpa_auth = htod32(WPA_AUTH_PFN_ANY);
-		pfn_element.wsec = htod32(0);
 		pfn_element.infra = htod32(1);
 
 		memcpy((char *)pfn_element.ssid.SSID, ssids_local[i].SSID, ssids_local[i].SSID_len);
@@ -2000,8 +2146,9 @@ dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid, ushort scan_fr)
 				return err;
 			}
 			else
-				DHD_ERROR(("%s set OK with PNO time=%d\n", __FUNCTION__, \
-								pfn_param.scan_freq));
+				DHD_ERROR(("%s set OK with PNO time=%d repeat=%d max_adjust=%d\n", \
+					__FUNCTION__, pfn_param.scan_freq, \
+					pfn_param.repeat_scan, pfn_param.max_freq_adjust));
 		}
 		else DHD_ERROR(("%s failed err=%d\n", __FUNCTION__, err));
 	}

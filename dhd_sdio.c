@@ -146,6 +146,8 @@
 DHD_SPINWAIT_SLEEP_INIT(sdioh_spinwait_sleep);
 extern int dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len);
 
+extern void bcmsdh_set_irq(int flag);
+
 #ifdef DHD_DEBUG
 /* Device console log buffer state */
 typedef struct dhd_console {
@@ -426,7 +428,6 @@ static void dhdsdio_sdtest_set(dhd_bus_t *bus, bool start);
 
 #ifdef DHD_DEBUG_TRAP
 static int dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size);
-static int dhdsdio_mem_dump(dhd_bus_t *bus);
 #endif /* DHD_DEBUG_TRAP */
 static int dhdsdio_download_state(dhd_bus_t *bus, bool enter);
 
@@ -459,6 +460,9 @@ static int dhdsdio_download_nvram(struct dhd_bus *bus);
 static int dhdsdio_download_code_array(struct dhd_bus *bus);
 #endif
 
+
+int dump_my_mem(struct dhd_bus *bus, uint32 address, uint32 count);
+int dump_my_packet(struct dhd_bus *bus, uint32 address);
 
 static void
 dhd_dongle_setmemsize(struct dhd_bus *bus, int mem_size)
@@ -1280,7 +1284,8 @@ dhd_bus_txctl(struct dhd_bus *bus, uchar *msg, uint msglen)
 			DHD_INFO(("%s: ctrl_frame_stat == FALSE\n", __FUNCTION__));
 			ret = 0;
 		} else {
-			DHD_INFO(("%s: ctrl_frame_stat == TRUE\n", __FUNCTION__));
+			if (!bus->dhd->hang_was_sent)
+				DHD_ERROR(("%s: ctrl_frame_stat == TRUE\n", __FUNCTION__));
 			ret = -1;
 		}
 	}
@@ -1637,7 +1642,7 @@ dhdsdio_pktgen_set(dhd_bus_t *bus, uint8 *arg)
 }
 #endif /* SDTEST */
 
-static int
+int
 dhdsdio_membytes(dhd_bus_t *bus, bool write, uint32 address, uint8 *data, uint size)
 {
 	int bcmerror = 0;
@@ -1829,23 +1834,19 @@ dhdsdio_checkdied(dhd_bus_t *bus, uint8 *data, uint size)
 			                                 (uint8*)&tr, sizeof(trap_t))) < 0)
 				goto done;
 
-			bcm_bprintf(&strbuf,
-			"Dongle trap type 0x%x @ epc 0x%x, cpsr 0x%x, spsr 0x%x, sp 0x%x,"
+			printf("Dongle trap type 0x%x @ epc 0x%x, cpsr 0x%x, spsr 0x%x, sp 0x%x,"
 			"lp 0x%x, rpc 0x%x Trap offset 0x%x, "
-			"r0 0x%x, r1 0x%x, r2 0x%x, r3 0x%x, r4 0x%x, r5 0x%x, r6 0x%x, r7 0x%x\n",
+			"r0 0x%x, r1 0x%x, r2 0x%x, r3 0x%x, r4 0x%x, r5 0x%x, r6 0x%x, r7 0x%x\nr8 0x%x, r9 0x%x, r10 0x%x\n",
 			tr.type, tr.epc, tr.cpsr, tr.spsr, tr.r13, tr.r14, tr.pc,
 			sdpcm_shared.trap_addr,
-			tr.r0, tr.r1, tr.r2, tr.r3, tr.r4, tr.r5, tr.r6, tr.r7);
+			tr.r0, tr.r1, tr.r2, tr.r3, tr.r4, tr.r5, tr.r6, tr.r7, tr.r8, tr.r9, tr.r10);
 		}
 	}
 
+	//dump_my_mem(bus, 0x3ea00, 1);
+	//printf("dump_my_mem: placeholder\n");
 	if (sdpcm_shared.flags & (SDPCM_SHARED_ASSERT | SDPCM_SHARED_TRAP)) {
-		DHD_ERROR(("%s: %s\n", __FUNCTION__, strbuf.origbuf));
-	}
-
-	if (sdpcm_shared.flags & SDPCM_SHARED_TRAP) {
-			/* Mem dump to a file on device */
-			dhdsdio_mem_dump(bus);
+		printf("%s: %s\n", __FUNCTION__, strbuf.origbuf);
 	}
 
 done:
@@ -1855,60 +1856,6 @@ done:
 		MFREE(bus->dhd->osh, str, maxstrlen);
 
 	return bcmerror;
-}
-
-static int
-dhdsdio_mem_dump(dhd_bus_t *bus)
-{
-	int ret = 0;
-	int size; /* Full mem size */
-	int start = 0; /* Start address */
-	int read_size = 0; /* Read size of each iteration */
-	uint8 *buf = NULL, *databuf = NULL;
-
-	/* Get full mem size */
-	size = bus->ramsize;
-	buf = MALLOC(bus->dhd->osh, size);
-	if (!buf) {
-		printf("%s: Out of memory (%d bytes)\n", __FUNCTION__, size);
-		return -1;
-	}
-
-	/* Read mem content */
-	printf("Dump dongle memory");
-	databuf = buf;
-	while (size)
-	{
-		read_size = MIN(MEMBLOCK, size);
-		if ((ret = dhdsdio_membytes(bus, FALSE, start, databuf, read_size)))
-		{
-			printf("%s: Error membytes %d\n", __FUNCTION__, ret);
-			if (buf) {
-				MFREE(bus->dhd->osh, buf, size);
-			}
-			return -1;
-		}
-		printf(".");
-
-		/* Decrement size and increment start address */
-		size -= read_size;
-		start += read_size;
-		databuf += read_size;
-	}
-	printf("Done\n");
-
-#ifdef DHD_DEBUG
-	/* free buf before return !!! */
-	if (write_to_file(bus->dhd, buf, bus->ramsize))
-	{
-		printf("%s: Error writing to files\n", __FUNCTION__);
-		return -1;
-	}
-	/* buf free handled in write_to_file, not here */
-#else
-	MFREE(bus->dhd->osh, buf, size);
-#endif
-	return 0;
 }
 #endif /* DHD_DEBUG_TRAP */
 
@@ -2414,8 +2361,11 @@ exit:
 
 	dhd_os_sdunlock(bus->dhd);
 
+    
 	if (actionid == IOV_SVAL(IOV_DEVRESET) && bool_val == FALSE)
+    {
 		dhd_preinit_ioctls((dhd_pub_t *) bus->dhd);
+    }
 
 	return bcmerror;
 }
@@ -3417,7 +3367,7 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq)
 		dhd_os_sdunlock_rxq(bus->dhd);
 		if (num) {
 			dhd_os_sdunlock(bus->dhd);
-			dhd_rx_frame(bus->dhd, ifidx, save_pfirst, num);
+			dhd_rx_frame(bus->dhd, ifidx, save_pfirst, num,0);
 			dhd_os_sdlock(bus->dhd);
 		}
 
@@ -3456,7 +3406,7 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 #endif
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
-
+	//dump_my_packet(bus, 0x00027E3C);
 	ASSERT(maxframes);
 
 #ifdef SDTEST
@@ -3933,7 +3883,7 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 
 #ifdef DHD_DEBUG
 		if (DHD_BYTES_ON() && DHD_DATA_ON()) {
-			prhex("Rx Data", PKTDATA(osh, pkt), len);
+			prhex("Rx Data 1", PKTDATA(osh, pkt), len);
 		}
 #endif
 
@@ -3959,6 +3909,15 @@ deliver:
 			continue;
 		}
 
+		if(chan==0xf)
+		{
+			//PKTSETLEN(osh, pkt, len+14);
+			//PKTPULL(osh, pkt, doff);
+			dhd_os_sdunlock(bus->dhd);
+			dhd_rx_frame(bus->dhd, ifidx, pkt, 1, chan);
+			dhd_os_sdlock(bus->dhd);
+			continue;
+		}
 		/* Fill in packet len and prio, deliver upward */
 		PKTSETLEN(osh, pkt, len);
 		PKTPULL(osh, pkt, doff);
@@ -3976,7 +3935,7 @@ deliver:
 			PKTFREE(bus->dhd->osh, pkt, FALSE);
 			dhd_os_sdunlock_rxq(bus->dhd);
 			continue;
-		} else if (dhd_prot_hdrpull(bus->dhd, &ifidx, pkt) != 0) {
+		} else if (chan != 0xf && dhd_prot_hdrpull(bus->dhd, &ifidx, pkt) != 0) {
 			DHD_ERROR(("%s: rx protocol error\n", __FUNCTION__));
 			dhd_os_sdlock_rxq(bus->dhd);
 			PKTFREE(bus->dhd->osh, pkt, FALSE);
@@ -3988,7 +3947,7 @@ deliver:
 
 		/* Unlock during rx call */
 		dhd_os_sdunlock(bus->dhd);
-		dhd_rx_frame(bus->dhd, ifidx, pkt, 1);
+		dhd_rx_frame(bus->dhd, ifidx, pkt, 1, chan);
 		dhd_os_sdlock(bus->dhd);
 	}
 	rxcount = maxframes - rxleft;
@@ -5486,6 +5445,33 @@ err:
 }
 #endif /* BCMEMBEDIMAGE */
 
+void
+hexdump(char *pfx, unsigned char *msg, int msglen, int address)
+{
+	int i, col;
+	char buf[80];
+
+	ASSERT(strlen(pfx) + 49 <= sizeof(buf));
+
+	col = 0;
+
+	for (i = 0; i < msglen; i++, col++) {
+		if (col % 16 == 0)
+		{
+			sprintf(buf, "%08x: ", address + i);
+			//strcpy(buf, pfx);
+		}
+		sprintf(buf + strlen(buf), "%02x", msg[i]);
+		if ((col + 1) % 16 == 0)
+			printf("%s\n", buf);
+		else
+			sprintf(buf + strlen(buf), " ");
+	}
+
+	if (col % 16 != 0)
+		printf("%s\n", buf);
+}
+
 static int
 dhdsdio_download_code_file(struct dhd_bus *bus, char *fw_path)
 {
@@ -5509,7 +5495,9 @@ dhdsdio_download_code_file(struct dhd_bus *bus, char *fw_path)
 	if ((uint32)(uintptr)memblock % DHD_SDALIGN)
 		memptr += (DHD_SDALIGN - ((uint32)(uintptr)memblock % DHD_SDALIGN));
 
-	/* Download image */
+
+        
+    /* Download image */
 	while ((len = dhd_os_get_image_block((char*)memptr, MEMBLOCK, image))) {
 		bcmerror = dhdsdio_membytes(bus, TRUE, offset, memptr, len);
 		if (bcmerror) {
@@ -5520,7 +5508,7 @@ dhdsdio_download_code_file(struct dhd_bus *bus, char *fw_path)
 
 		offset += MEMBLOCK;
 	}
-
+    
 err:
 	if (memblock)
 		MFREE(bus->dhd->osh, memblock, MEMBLOCK + DHD_SDALIGN);
@@ -5528,6 +5516,7 @@ err:
 	if (image)
 		dhd_os_close_image(image);
 
+        
 	return bcmerror;
 }
 
@@ -5752,6 +5741,7 @@ dhd_bcmsdh_recv_buf(dhd_bus_t *bus, uint32 addr, uint fn, uint flags, uint8 *buf
 {
 	int status;
 
+	//printf("dhd_bcmsdh_recv_buf: addr = %08X\n", addr);
 	/* 4329: GSPI check */
 	status = bcmsdh_recv_buf(bus->sdh, addr, fn, flags, buf, nbytes, pkt, complete, handle);
 	return status;
@@ -5809,7 +5799,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 			/* Expect app to have torn down any connection before calling */
 			/* Stop the bus, disable F2 */
 			dhd_bus_stop(bus, FALSE);
-
+#if defined(OOB_INTR_ONLY)
+			bcmsdh_set_irq(FALSE);
+#endif /* defined(OOB_INTR_ONLY) */
 			/* Clean tx/rx buffer pointers, detach from the dongle */
 			dhdsdio_release_dongle(bus, bus->dhd->osh, TRUE);
 
@@ -5845,6 +5837,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					bcmerror = dhd_bus_init((dhd_pub_t *) bus->dhd, FALSE);
 					if (bcmerror == BCME_OK) {
 #if defined(OOB_INTR_ONLY)
+						bcmsdh_set_irq(TRUE);
 						dhd_enable_oob_intr(bus, TRUE);
 #endif /* defined(OOB_INTR_ONLY) */
 						bus->dhd->dongle_reset = FALSE;
