@@ -53,6 +53,10 @@
 #define PNOENABLE_SET_CMD			"PNOFORCE"
 #define PNODEBUG_SET_CMD			"PNODEBUG"
 #define TXPOWER_SET_CMD				"TXPOWER"
+#define RXFILTER_START_CMD			"RXFILTER-START"
+#define RXFILTER_STOP_CMD			"RXFILTER-STOP"
+#define RXFILTER_ADD_CMD			"RXFILTER-ADD"
+#define RXFILTER_REMOVE_CMD			"RXFILTER-REMOVE"
 
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -63,14 +67,14 @@ typedef struct wl_iw_extra_params {
 } wl_iw_extra_params_t;
 
 #define	WL_IW_RSSI_MINVAL	-200
-#define	WL_IW_RSSI_NO_SIGNAL	-98
-#define	WL_IW_RSSI_VERY_LOW	-87
-#define	WL_IW_RSSI_LOW		-77
-#define	WL_IW_RSSI_GOOD		-75
-#define	WL_IW_RSSI_VERY_GOOD	-65
-#define	WL_IW_RSSI_EXCELLENT	-64
+#define	WL_IW_RSSI_NO_SIGNAL	-91
+#define	WL_IW_RSSI_VERY_LOW	-80
+#define	WL_IW_RSSI_LOW		-70
+#define	WL_IW_RSSI_GOOD		-68
+#define	WL_IW_RSSI_VERY_GOOD	-58
+#define	WL_IW_RSSI_EXCELLENT	-57
 #define	WL_IW_RSSI_INVALID	 0
-#define MAX_WX_STRING		87
+#define MAX_WX_STRING		80
 #define isprint(c)		bcm_isprint(c)
 #define WL_IW_SET_ACTIVE_SCAN	(SIOCIWFIRSTPRIV+1)
 #define WL_IW_GET_RSSI		(SIOCIWFIRSTPRIV+3)
@@ -198,7 +202,6 @@ extern int net_os_wake_lock_timeout_enable(struct net_device *dev);
 extern int net_os_set_suspend_disable(struct net_device *dev, int val);
 extern int net_os_set_suspend(struct net_device *dev, int val);
 extern int net_os_set_dtim_skip(struct net_device *dev, int val);
-extern int net_os_set_packet_filter(struct net_device *dev, int val);
 extern void dhd_bus_country_set(struct net_device *dev, char *country_code);
 extern char *dhd_bus_country_get(struct net_device *dev);
 extern int dhd_get_dtim_skip(dhd_pub_t *dhd);

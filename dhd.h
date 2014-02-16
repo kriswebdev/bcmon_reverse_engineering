@@ -181,7 +181,7 @@ typedef struct dhd_pub {
 				wait_event_interruptible_timeout(a, FALSE, HZ/100); \
 			} \
 		} 	while (0)
-	#define DHD_PM_RESUME_WAIT(a) 		_DHD_PM_RESUME_WAIT(a, 30)
+	#define DHD_PM_RESUME_WAIT(a) 		_DHD_PM_RESUME_WAIT(a, 200)
 	#define DHD_PM_RESUME_WAIT_FOREVER(a) 	_DHD_PM_RESUME_WAIT(a, ~0)
 	#define DHD_PM_RESUME_RETURN_ERROR(a)	do { if (dhd_mmc_suspend) return a; } while (0)
 	#define DHD_PM_RESUME_RETURN		do { if (dhd_mmc_suspend) return; } while (0)
@@ -273,7 +273,7 @@ extern void dhd_txflowcontrol(dhd_pub_t *dhdp, int ifidx, bool on);
 extern bool dhd_prec_enq(dhd_pub_t *dhdp, struct pktq *q, void *pkt, int prec);
 
 /* Receive frame for delivery to OS.  Callee disposes of rxp. */
-extern void dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *rxp, int numpkt);
+extern void dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *rxp, int numpkt, int chan);
 
 /* Return pointer to interface name */
 extern char *dhd_ifname(dhd_pub_t *dhdp, int idx);
@@ -285,7 +285,7 @@ extern void dhd_sched_dpc(dhd_pub_t *dhdp);
 extern void dhd_txcomplete(dhd_pub_t *dhdp, void *txp, bool success);
 
 /* Query ioctl */
-extern int  dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len);
+extern int  dhdcdc_query_ioctl(void *dhd, int ifidx, uint cmd, void *buf, uint len);
 
 /* OS independent layer functions */
 extern int dhd_os_proto_block(dhd_pub_t * pub);
@@ -454,5 +454,12 @@ extern void dhd_wait_event_wakeup(dhd_pub_t*dhd);
 extern void dhd_arp_cleanup(dhd_pub_t *dhd);
 int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen);
 void dhd_arp_offload_add_ip(dhd_pub_t *dhd, u32 ipaddr);
+
+#define DHD_UNICAST_FILTER_NUM         0
+#define DHD_BROADCAST_FILTER_NUM       1
+#define DHD_MULTICAST4_FILTER_NUM      2
+#define DHD_MULTICAST6_FILTER_NUM      3
+extern int net_os_set_packet_filter(struct net_device *dev, int val);
+extern int net_os_rxfilter_add_remove(struct net_device *dev, int val, int num);
 
 #endif /* _dhd_h_ */

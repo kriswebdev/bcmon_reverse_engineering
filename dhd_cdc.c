@@ -111,8 +111,9 @@ dhdcdc_cmplt(dhd_pub_t *dhd, uint32 id, uint32 len)
 }
 
 int
-dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len)
+dhdcdc_query_ioctl(void *dhd_temp, int ifidx, uint cmd, void *buf, uint len)
 {
+	dhd_pub_t *dhd = (dhd_pub_t*)dhd_temp;
 	dhd_prot_t *prot = dhd->prot;
 	cdc_ioctl_t *msg = &prot->msg;
 	void *info;
@@ -259,8 +260,9 @@ done:
 
 extern int dhd_bus_interface(struct dhd_bus *bus, uint arg, void* arg2);
 int
-dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
+dhd_prot_ioctl(void* dhd_copy, int ifidx, wl_ioctl_t * ioc, void * buf, int len)
 {
+	dhd_pub_t *dhd = (dhd_pub_t *)dhd_copy;
 	dhd_prot_t *prot = dhd->prot;
 	int ret = -1;
 
@@ -497,6 +499,8 @@ dhd_prot_dstats(dhd_pub_t *dhd)
 	return;
 }
 
+extern int dhdsdio_membytes(void *bus, bool write, uint32 address, uint8 *data, uint size);
+
 int
 dhd_prot_init(dhd_pub_t *dhd)
 {
@@ -519,7 +523,7 @@ dhd_prot_init(dhd_pub_t *dhd)
 	dhd_os_proto_unblock(dhd);
 
 #ifdef EMBEDDED_PLATFORM
-	ret = dhd_preinit_ioctls(dhd);
+    ret = dhd_preinit_ioctls(dhd);
 #endif /* EMBEDDED_PLATFORM */
 
 	/* Always assumes wl for now */
