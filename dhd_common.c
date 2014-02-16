@@ -1159,6 +1159,8 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 		goto fail;
 	}
 
+
+
 	pkt_filter.u.pattern.size_bytes = mask_size;
 	buf_len += WL_PKT_FILTER_FIXED_LEN;
 	buf_len += (WL_PKT_FILTER_PATTERN_FIXED_LEN + 2 * mask_size);
@@ -1301,7 +1303,6 @@ int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen)
 	return 0;
 }
 
-
 int
 dhd_preinit_ioctls(dhd_pub_t *dhd)
 {
@@ -1369,10 +1370,9 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #endif /* SET_RANDOM_MAC_SOFTAP */
 
 	/* Set Country code */
-	if (dhd->dhd_cspec.ccode[0] != 0) {
-		bcm_mkiovar("country", (char *)&dhd->dhd_cspec, \
-			sizeof(wl_country_t), iovbuf, sizeof(iovbuf));
-		if ((ret = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf))) < 0) {
+	if (dhd->country_code[0] != 0) {
+		if (dhdcdc_set_ioctl(dhd, 0, WLC_SET_COUNTRY,
+			dhd->country_code, sizeof(dhd->country_code)) < 0) {
 			DHD_ERROR(("%s: country code setting failed\n", __FUNCTION__));
 		}
 	}
@@ -1389,7 +1389,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhdcdc_query_ioctl(dhd, 0, WLC_GET_VAR, buf, sizeof(buf));
 	bcmstrtok(&ptr, "\n", 0);
 	/* Print fw version info */
-	DHD_ERROR(("Firmware version = %s\n", buf));
+    DHD_ERROR(("Firmware version = %s\n", buf));
 
 	/* Set PowerSave mode */
 	dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode, sizeof(power_mode));

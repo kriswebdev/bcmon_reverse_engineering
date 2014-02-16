@@ -519,7 +519,7 @@ dhd_prot_init(dhd_pub_t *dhd)
 	dhd_os_proto_unblock(dhd);
 
 #ifdef EMBEDDED_PLATFORM
-	ret = dhd_preinit_ioctls(dhd);
+    ret = dhd_preinit_ioctls(dhd);
 #endif /* EMBEDDED_PLATFORM */
 
 	/* Always assumes wl for now */

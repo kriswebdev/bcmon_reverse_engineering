@@ -2357,8 +2357,11 @@ exit:
 
 	dhd_os_sdunlock(bus->dhd);
 
+
 	if (actionid == IOV_SVAL(IOV_DEVRESET) && bool_val == FALSE)
+    {
 		dhd_preinit_ioctls((dhd_pub_t *) bus->dhd);
+    }
 
 	return bcmerror;
 }
@@ -5361,7 +5364,9 @@ dhdsdio_download_code_array(struct dhd_bus *bus)
 
 	DHD_INFO(("%s: download embedded firmware...\n", __FUNCTION__));
 
-	/* Download image */
+    /* Download image */
+
+
 	while ((offset + MEMBLOCK) < sizeof(dlarray)) {
 		bcmerror = dhdsdio_membytes(bus, TRUE, offset, dlarray + offset, MEMBLOCK);
 		if (bcmerror) {
@@ -5423,7 +5428,7 @@ dhdsdio_download_code_array(struct dhd_bus *bus)
 		MFREE(bus->dhd->osh, ularray, bus->ramsize);
 	}
 #endif /* DHD_DEBUG */
-
+    
 err:
 	return bcmerror;
 }
@@ -5471,6 +5476,7 @@ err:
 	if (image)
 		dhd_os_close_image(image);
 
+        
 	return bcmerror;
 }
 
