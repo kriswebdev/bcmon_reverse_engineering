@@ -335,8 +335,8 @@ dev_wlc_ioctl(
 
 	net_os_wake_lock(dev);
 
-	WL_INFORM(("\n%s, PID:%x: send Local IOCTL -> dhd: cmd:0x%x, buf:%p, len:%d ,\n",
-		__FUNCTION__, current->pid, cmd, arg, len));
+	printf("\n%s, PID:%x: send Local IOCTL -> dhd: cmd:0x%x, buf:%p, len:%d ,\n",
+		__FUNCTION__, current->pid, cmd, arg, len);
 
 	if (g_onoff == G_WLAN_SET_ON) {
 		memset(&ioc, 0, sizeof(ioc));
@@ -2311,6 +2311,7 @@ wl_iw_set_mode(
 		infra = ap = 1;
 		break;
 	case IW_MODE_ADHOC:
+	case IW_MODE_MONITOR:
 	case IW_MODE_AUTO:
 		break;
 	case IW_MODE_INFRA:
@@ -2348,7 +2349,7 @@ wl_iw_get_mode(
 
 	infra = dtoh32(infra);
 	ap = dtoh32(ap);
-	*uwrq = infra ? ap ? IW_MODE_MASTER : IW_MODE_INFRA : IW_MODE_ADHOC;
+	*uwrq = IW_MODE_MONITOR;
 
 	return 0;
 }
@@ -5158,24 +5159,12 @@ wl_iw_set_pmksa(
 		if ((pmkid_list.pmkids.npmkid > 0) && (i < pmkid_list.pmkids.npmkid)) {
 			bzero(&pmkid_list.pmkids.pmkid[i], sizeof(pmkid_t));
 			for (; i < (pmkid_list.pmkids.npmkid - 1); i++) {
-				if (i == 0)
-				{
-					bcopy(&pmkid_list.foo[0].BSSID,
-						&pmkid_list.pmkids.pmkid[i].BSSID,
-						ETHER_ADDR_LEN);
-					bcopy(&pmkid_list.foo[0].PMKID,
-						&pmkid_list.pmkids.pmkid[i].PMKID,
-						WPA2_PMKID_LEN);
-				}
-				else
-				{
-					bcopy(&pmkid_list.foo[i+1].BSSID,
-						&pmkid_list.foo[i].BSSID,
-						ETHER_ADDR_LEN);
-					bcopy(&pmkid_list.foo[i+1].PMKID,
-						&pmkid_list.foo[i].PMKID,
+				bcopy(&pmkid_list.pmkids.pmkid[i+1].BSSID,
+					&pmkid_list.pmkids.pmkid[i].BSSID,
+					ETHER_ADDR_LEN);
+				bcopy(&pmkid_list.pmkids.pmkid[i+1].PMKID,
+					&pmkid_list.pmkids.pmkid[i].PMKID,
 					WPA2_PMKID_LEN);
-				}
 			}
 			pmkid_list.pmkids.npmkid--;
 		}
@@ -5897,7 +5886,7 @@ static int iwpriv_set_cscan(struct net_device *dev, struct iw_request_info *info
 	int nssid = 0;
 	int nchan = 0;
 
-	WL_TRACE(("\%s: info->cmd:%x, info->flags:%x, u.data=0x%p, u.len=%d\n",
+	WL_TRACE(("%s: info->cmd:%x, info->flags:%x, u.data=0x%p, u.len=%d\n",
 		__FUNCTION__, info->cmd, info->flags,
 		wrqu->data.pointer, wrqu->data.length));
 
@@ -7268,27 +7257,39 @@ static int wl_iw_set_priv(
 			ret = wl_iw_set_pno_enable(dev, info, (union iwreq_data *)dwrq, extra);
 #endif
 #if defined(CSCAN)
-	    else if (strnicmp(extra, CSCAN_COMMAND, strlen(CSCAN_COMMAND)) == 0)
+		else if (strnicmp(extra, CSCAN_COMMAND, strlen(CSCAN_COMMAND)) == 0)
 			ret = wl_iw_set_cscan(dev, info, (union iwreq_data *)dwrq, extra);
-#endif 
+#endif
 #ifdef CUSTOMER_HW2
 		else if (strnicmp(extra, "POWERMODE", strlen("POWERMODE")) == 0)
 			ret = wl_iw_set_power_mode(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, "BTCOEXMODE", strlen("BTCOEXMODE")) == 0) {
+		else if (strnicmp(extra, "BTCOEXMODE", strlen("BTCOEXMODE")) == 0) {
 			WL_TRACE_COEX(("%s:got Framwrork cmd: 'BTCOEXMODE'\n", __FUNCTION__));
 			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
-	    }
+		}
 #else
 		else if (strnicmp(extra, "POWERMODE", strlen("POWERMODE")) == 0)
 			ret = wl_iw_set_btcoex_dhcp(dev, info, (union iwreq_data *)dwrq, extra);
 #endif
 		else if (strnicmp(extra, "GETPOWER", strlen("GETPOWER")) == 0)
 			ret = wl_iw_get_power_mode(dev, info, (union iwreq_data *)dwrq, extra);
+		else if (strnicmp(extra, RXFILTER_START_CMD, strlen(RXFILTER_START_CMD)) == 0)
+			ret = net_os_set_packet_filter(dev, 1);
+		else if (strnicmp(extra, RXFILTER_STOP_CMD, strlen(RXFILTER_STOP_CMD)) == 0)
+			ret = net_os_set_packet_filter(dev, 0);
+		else if (strnicmp(extra, RXFILTER_ADD_CMD, strlen(RXFILTER_ADD_CMD)) == 0) {
+			int filter_num = *(extra + strlen(RXFILTER_ADD_CMD) + 1) - '0';
+			ret = net_os_rxfilter_add_remove(dev, TRUE, filter_num);
+		}
+		else if (strnicmp(extra, RXFILTER_REMOVE_CMD, strlen(RXFILTER_REMOVE_CMD)) == 0) {
+			int filter_num = *(extra + strlen(RXFILTER_REMOVE_CMD) + 1) - '0';
+			ret = net_os_rxfilter_add_remove(dev, FALSE, filter_num);
+		}
 #ifdef SOFTAP
 #ifdef SOFTAP_TLV_CFG
 		else if (strnicmp(extra, SOFTAP_SET_CMD, strlen(SOFTAP_SET_CMD)) == 0) {
 		    wl_iw_softap_cfg_tlv(dev, info, (union iwreq_data *)dwrq, extra);
-	    }
+		}
 #endif
 		else if (strnicmp(extra, "ASCII_CMD", strlen("ASCII_CMD")) == 0) {
 			wl_iw_process_private_ascii_cmd(dev, info, (union iwreq_data *)dwrq, extra);

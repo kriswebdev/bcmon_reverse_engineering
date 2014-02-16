@@ -70,7 +70,7 @@ extern void dhd_prot_hdrpush(dhd_pub_t *, int ifidx, void *txp);
 extern int dhd_prot_hdrpull(dhd_pub_t *, int *ifidx, void *rxp);
 
 /* Use protocol to issue ioctl to dongle */
-extern int dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len);
+extern int dhd_prot_ioctl(void *dhd, int ifidx, wl_ioctl_t * ioc, void * buf, int len);
 
 /* Check for and handle local prot-specific iovar commands */
 extern int dhd_prot_iovar_op(dhd_pub_t *dhdp, const char *name,

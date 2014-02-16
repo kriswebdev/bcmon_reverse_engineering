@@ -135,6 +135,8 @@ const bcm_iovar_t dhd_iovars[] = {
 	{NULL, 0, 0, 0, 0 }
 };
 
+dhd_pub_t *global_dhd;
+
 void
 dhd_common_init(void)
 {
@@ -144,7 +146,8 @@ dhd_common_init(void)
 	 * behaviour since the value of the globals may be different on the
 	 * first time that the driver is initialized vs subsequent initializations.
 	 */
-	dhd_msg_level = DHD_ERROR_VAL;
+
+	dhd_msg_level = 1; //0xffffffff;//DHD_ERROR_VAL;
 #ifdef CONFIG_BCM4329_FW_PATH
 	strncpy(fw_path, CONFIG_BCM4329_FW_PATH, MOD_PARAM_PATHLEN-1);
 #else
@@ -155,6 +158,7 @@ dhd_common_init(void)
 #else
 	nv_path[0] = '\0';
 #endif
+    printk("bcmon: we are running!!!\n");
 }
 
 static int
@@ -992,6 +996,9 @@ dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable, int master_
 	wl_pkt_filter_enable_t	enable_parm;
 	wl_pkt_filter_enable_t	* pkt_filterp;
 
+	if (!arg)
+		return;
+
 	if (!(arg_save = MALLOC(dhd->osh, strlen(arg) + 1))) {
 		DHD_ERROR(("%s: kmalloc failed\n", __FUNCTION__));
 		goto fail;
@@ -1049,6 +1056,9 @@ fail:
 		MFREE(dhd->osh, arg_org, strlen(arg) + 1);
 }
 
+extern void
+hexdump(char *pfx, unsigned char *msg, int msglen);
+
 void
 dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 {
@@ -1064,6 +1074,9 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	int					i = 0;
 	char				*arg_save = 0, *arg_org = 0;
 #define BUF_SIZE		2048
+
+	if (!arg)
+		return;
 
 	if (!(arg_save = MALLOC(dhd->osh, strlen(arg) + 1))) {
 		DHD_ERROR(("%s: kmalloc failed\n", __FUNCTION__));
@@ -1153,6 +1166,8 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 		goto fail;
 	}
 
+
+
 	pkt_filter.u.pattern.size_bytes = mask_size;
 	buf_len += WL_PKT_FILTER_FIXED_LEN;
 	buf_len += (WL_PKT_FILTER_PATTERN_FIXED_LEN + 2 * mask_size);
@@ -1165,6 +1180,7 @@ dhd_pktfilter_offload_set(dhd_pub_t * dhd, char *arg)
 	       &pkt_filter,
 	       WL_PKT_FILTER_FIXED_LEN + WL_PKT_FILTER_PATTERN_FIXED_LEN);
 
+	hexdump("filter_buf:", buf,buf_len);
 	rc = dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, buf, buf_len);
 	rc = rc >= 0 ? 0 : rc;
 
@@ -1295,7 +1311,6 @@ int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen)
 	return 0;
 }
 
-
 int
 dhd_preinit_ioctls(dhd_pub_t *dhd)
 {
@@ -1317,6 +1332,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	struct ether_addr ea_addr;
 #endif /* GET_CUSTOM_MAC_ENABLE */
 
+    global_dhd = dhd;
 	dhd_os_proto_block(dhd);
 
 #ifdef GET_CUSTOM_MAC_ENABLE
@@ -1382,7 +1398,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhdcdc_query_ioctl(dhd, 0, WLC_GET_VAR, buf, sizeof(buf));
 	bcmstrtok(&ptr, "\n", 0);
 	/* Print fw version info */
-	DHD_ERROR(("Firmware version = %s\n", buf));
+    DHD_ERROR(("Firmware version = %s\n", buf));
 
 	/* Set PowerSave mode */
 	dhdcdc_set_ioctl(dhd, 0, WLC_SET_PM, (char *)&power_mode, sizeof(power_mode));
@@ -1889,6 +1905,41 @@ fail:
 
 #endif
 
+/*
+ * returns = TRUE if associated, FALSE if not associated
+ */
+bool is_associated(dhd_pub_t *dhd, void *bss_buf)
+{
+	char bssid[ETHER_ADDR_LEN], zbuf[ETHER_ADDR_LEN];
+	int ret = -1;
+
+	bzero(bssid, ETHER_ADDR_LEN);
+	bzero(zbuf, ETHER_ADDR_LEN);
+
+	ret = dhdcdc_set_ioctl(dhd, 0, WLC_GET_BSSID, (char *)bssid, ETHER_ADDR_LEN);
+	DHD_TRACE((" %s WLC_GET_BSSID ioctl res = %d\n", __FUNCTION__, ret));
+
+	if (ret == BCME_NOTASSOCIATED) {
+		DHD_TRACE(("%s: not associated! res:%d\n", __FUNCTION__, ret));
+	}
+
+	if (ret < 0)
+		return FALSE;
+
+	if ((memcmp(bssid, zbuf, ETHER_ADDR_LEN) != 0)) {
+		/*  STA is assocoated BSSID is non zero */
+
+		if (bss_buf) {
+			/* return bss if caller provided buf */
+			memcpy(bss_buf, bssid, ETHER_ADDR_LEN);
+		}
+		return TRUE;
+	} else {
+		DHD_TRACE(("%s: WLC_GET_BSSID ioctl returned zero bssid\n", __FUNCTION__));
+		return FALSE;
+	}
+}
+
 /* Function to estimate possible DTIM_SKIP value */
 int dhd_get_dtim_skip(dhd_pub_t *dhd)
 {
@@ -1972,7 +2023,6 @@ int dhd_pno_clean(dhd_pub_t *dhd)
 int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 {
 	char iovbuf[128];
-	uint8 bssid[6];
 	int ret = -1;
 
 	if ((!dhd) && ((pfn_enabled != 0) || (pfn_enabled != 1))) {
@@ -1983,15 +2033,10 @@ int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled)
 	memset(iovbuf, 0, sizeof(iovbuf));
 
 	/* Check if disassoc to enable pno */
-	if ((pfn_enabled) && \
-		((ret = dhdcdc_set_ioctl(dhd, 0, WLC_GET_BSSID, \
-				 (char *)&bssid, ETHER_ADDR_LEN)) == BCME_NOTASSOCIATED)) {
-			DHD_TRACE(("%s pno enable called in disassoc mode\n", __FUNCTION__));
-	}
-	else {
-			DHD_ERROR(("%s pno enable called in assoc mode ret=%d\n", \
-										__FUNCTION__, ret));
-			return ret;
+	if (pfn_enabled && (is_associated(dhd, NULL) == TRUE)) {
+		DHD_ERROR(("%s pno enable called in assoc mode ret=%d\n", \
+			__FUNCTION__, ret));
+		return ret;
 	}
 
 	/* Enable/disable PNO */
